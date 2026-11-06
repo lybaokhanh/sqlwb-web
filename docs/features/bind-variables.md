@@ -1,6 +1,6 @@
 # Bind variables: ask for missing values
 
-Since: Unreleased
+Since: v0.2.0
 
 ![Variable values dialog](../images/bind-variables.png)
 
