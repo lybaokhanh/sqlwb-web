@@ -7,7 +7,7 @@ export interface Menu { title: string; items: MenuItem[]; /** Extra items from s
 export const MENUS: Menu[] = [
   { title: 'File', items: ['connect', 'reconnect', 'disconnect', '-', 'newTab', 'closeTab', 'renameTab', '-', 'saveWorkspace', 'loadWorkspace', '-', 'logout'] },
   { title: 'Edit', items: ['undo', 'redo', '-', 'find', 'replace', '-', 'toggleComment', 'lowerCase', 'upperCase', 'matchBracket', 'gotoLine', '-', 'commandPalette'] },
-  { title: 'View', items: ['nextTab', 'prevTab', '-', 'focusEditor', 'sqlEditor', 'focusMaxRows', 'expandEditor', '-', 'toggleTheme'] },
+  { title: 'View', items: ['nextTab', 'prevTab', '-', 'focusEditor', 'sqlEditor', 'focusMaxRows', 'expandEditor', '-', 'verticalTabs', 'toggleTheme'] },
   { title: 'Data', items: ['saveChanges', 'insertRow', 'copyRow', 'deleteRow', '-', 'filter', 'findInData', '-', 'copyData', 'copyAsInsert', 'saveDataAs', '-', 'optimizeWidths', '-', 'closeResult'] },
   { title: 'SQL', items: ['execCurrent', 'execSelected', 'execAll', 'cancel', '-', 'reformat', 'completion', 'jumpToStatement', '-', 'commit', 'rollback', '-', 'histFirst', 'histBack', 'histNext', 'histLast'] },
   { title: 'Macros', items: ['manageMacros', 'runMacro'], dynamic: 'macros' },

@@ -345,18 +345,59 @@ export function openTabFor(profileId: string) {
 }
 
 /**
- * Connects the ACTIVE statement tab with another profile (no new tab), as the desktop app does.
- * The server closes the old connection first (open transaction: rollback). SQL and results stay.
- * Falls back to a new tab when the active tab is the DB Explorer or is running.
+ * Connect (no new tab): ALL statement tabs and DB Explorers switch to the profile.
+ * The server closes each old connection first (open transaction: rollback). SQL text stays.
+ * A running tab keeps its connection and logs a note. All tabs running: a new tab opens.
+ * Only one DB Explorer stays open (a running one also stays).
  */
 export function switchTabProfile(profileId: string) {
-  const tab = activeTab();
-  if (!tab || tab.kind === 'explorer' || tab.running) { openTabFor(profileId); return; }
-  set({ dialog: null });
-  if (tab.profileId === profileId && tab.conn === 'connected') return;
+  const all = get().tabs;
+  let targets = all.filter((t) => !t.running && !(t.profileId === profileId && t.conn === 'connected'));
+  const busy = all.filter((t) => t.running && t.profileId !== profileId);
+  if (!targets.length && !all.some((t) => !t.running)) { openTabFor(profileId); return; }
+  const go = () => {
+    set({ dialog: null });
+    const name = get().profiles[profileId]?.name ?? profileId;
+    busy.forEach((t) => log(t.id, 'warn', `Still running: this tab stays on its connection. Use Connect again for ${name}.`));
+    const cur = activeTab();
+    // One schema for all tabs = one DB Explorer. Keep the active one, else the one of the active tab, else the first.
+    const explorers = get().tabs.filter((t) => t.kind === 'explorer' && !t.running);
+    const keep = explorers.find((t) => t.id === cur?.id)
+      ?? explorers.find((t) => t.sourceTabId === cur?.id) ?? explorers[0];
+    explorers.forEach((t) => { if (t !== keep) closeTabNow(t.id); });
+    targets = targets.filter((t) => t.kind !== 'explorer' || t === keep);
+    if (!targets.length) return;
+    // Main tab first (active tab when possible): it asks for the password once. The others connect after it.
+    const main = targets.find((t) => t.id === cur?.id)
+      ?? targets.find((t) => t.id === cur?.sourceTabId) ?? targets[0];
+    void reconnectTab(main.id, profileId).then((ok) => {
+      if (ok) targets.forEach((t) => { if (t.id !== main.id) void reconnectTab(t.id, profileId); });
+    });
+  };
+  const open = targets.filter(uncommitted);
+  if (!open.length) { go(); return; }
+  set({
+    dialog: {
+      kind: 'confirm', title: 'Uncommitted changes', danger: true, okLabel: 'Roll back and switch',
+      text: `${open.map((t) => `"${t.title}"`).join(', ')} ${open.length > 1 ? 'have' : 'has'} changes that are not committed. All tabs switch schema, so they are rolled back. Use Commit (Alt+M) first to keep them.`,
+      onOk: go,
+    },
+  });
+}
+
+/** Connects one tab with another profile. A DB Explorer also drops its old data. */
+export function reconnectTab(tabId: string, profileId: string): Promise<boolean> {
+  const tab = get().tabs.find((t) => t.id === tabId);
+  if (!tab) return Promise.resolve(false);
+  if (tab.profileId === profileId && (tab.conn === 'connected' || tab.conn === 'connecting')) return ensureConnected(tabId);
   // No "disconnect" message: connect on the same server tab closes the old connection in order.
-  updateTab(tab.id, { profileId, conn: 'none', info: undefined });
-  void ensureConnected(tab.id);
+  const patch: Partial<Tab> = { profileId, conn: 'none', info: undefined };
+  if (tab.kind === 'explorer') {
+    tab.results.forEach((r) => dropRows(r.id));
+    Object.assign(patch, { results: [], activeResult: 'messages' });
+  }
+  updateTab(tabId, patch);
+  return ensureConnected(tabId);
 }
 
 export function addTab() {
@@ -410,11 +451,22 @@ function closeTabNow(id: string) {
 
 export function selectTab(id: string) { set({ activeTabId: id }); }
 
+/** Tabs grouped by profile (schema), in the order each profile first appears. The tab bar shows this order. */
+export function groupTabs(tabs: Tab[]): { profileId: string; tabs: Tab[] }[] {
+  const groups = new Map<string, Tab[]>();
+  for (const t of tabs) {
+    const g = groups.get(t.profileId);
+    if (g) g.push(t); else groups.set(t.profileId, [t]);
+  }
+  return [...groups].map(([profileId, members]) => ({ profileId, tabs: members }));
+}
+
 export function cycleTab(dir: 1 | -1) {
   const s = get();
-  const i = s.tabs.findIndex((t) => t.id === s.activeTabId);
-  const n = s.tabs.length;
-  set({ activeTabId: s.tabs[(i + dir + n) % n].id });
+  const order = groupTabs(s.tabs).flatMap((g) => g.tabs);
+  const i = order.findIndex((t) => t.id === s.activeTabId);
+  const n = order.length;
+  set({ activeTabId: order[(i + dir + n) % n].id });
 }
 
 export function moveTab(from: number, to: number) {

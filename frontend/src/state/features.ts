@@ -2,7 +2,7 @@
 import type { Macro } from '../api/protocol';
 import { editorBridge } from '../editor/bridge';
 import {
-  activeTab, ensureConnected, executeText, log, makeTab, selectTab, useStore,
+  activeTab, ensureConnected, executeText, log, makeTab, reconnectTab, selectTab, updateTab, useStore,
 } from './store';
 
 // ---- DB Explorer ----
@@ -10,12 +10,21 @@ export function openExplorer() {
   const s = useStore.getState();
   const cur = activeTab();
   if (!cur) return;
-  const existing = s.tabs.find((t) => t.kind === 'explorer' && t.profileId === cur.profileId);
-  if (existing) { selectTab(existing.id); return; }
+  if (cur.kind === 'explorer') return;
+  // Re-use the DB Explorer of this statement tab (it follows the profile), else one of the same profile.
+  const existing = s.tabs.find((t) => t.kind === 'explorer' && t.sourceTabId === cur.id)
+    ?? s.tabs.find((t) => t.kind === 'explorer' && t.profileId === cur.profileId);
+  if (existing) {
+    // "Put SELECT in editor" goes to the tab the explorer was opened from last.
+    if (existing.sourceTabId !== cur.id) updateTab(existing.id, { sourceTabId: cur.id });
+    selectTab(existing.id);
+    if (existing.profileId !== cur.profileId && !existing.running) void reconnectTab(existing.id, cur.profileId);
+    return;
+  }
   const tab = {
     ...makeTab('DB Explorer', cur.profileId),
     kind: 'explorer' as const,
-    sourceTabId: cur.kind === 'explorer' ? cur.sourceTabId : cur.id,
+    sourceTabId: cur.id,
   };
   useStore.setState({ tabs: [...s.tabs, tab], activeTabId: tab.id });
   void ensureConnected(tab.id);

@@ -119,6 +119,114 @@ test.describe('mock', () => {
     await ask.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByRole('tab', { name: /Statement 2/ })).toBeVisible();
   });
+
+  test('switch profile from DB Explorer: statement tab and explorer follow, no new tabs', async ({ page }) => {
+    await start(page);
+    await page.locator('[data-action="dbExplorer"]').click();
+    await expect(page.getByRole('tab', { name: /DB Explorer/ })).toBeVisible();
+    const tabs = page.getByRole('tab');
+    const count = await tabs.count();
+    for (const name of ['SCHEMA_B', 'SCHEMA_C']) {
+      await page.keyboard.press('Alt+C');
+      const cm = page.getByRole('dialog', { name: 'Select Connection Profile' });
+      await cm.locator('input[name="profileName"]').fill(name);
+      await cm.locator('input[name="username"]').fill('scott');
+      await cm.locator('input[name="password"]').fill('tiger');
+      await cm.getByRole('button', { name: 'Connect', exact: true }).click();
+      await expect(cm).toBeHidden();
+      await expect(page.locator('.tb-conn .conn-state.connected')).toBeVisible();
+      await expect(tabs).toHaveCount(count);
+      // Both tabs sit in the group of the new schema. The old group is gone.
+      const group = page.getByRole('group', { name });
+      await expect(group.getByRole('tab', { name: /Statement 1/ })).toBeVisible();
+      await expect(group.getByRole('tab', { name: /DB Explorer/ })).toBeVisible();
+      await expect(page.getByTestId('tab-group')).toHaveCount(1);
+      // Ctrl+D from the statement tab re-uses the same explorer.
+      await page.getByRole('tab', { name: /Statement 1/ }).click();
+      await page.locator('[data-action="dbExplorer"]').click();
+      await expect(page.getByRole('tab', { name: /DB Explorer/ })).toHaveCount(1);
+      await expect(tabs).toHaveCount(count);
+    }
+    // Collapse the group: only the active tab stays visible, with the tab count.
+    const group = page.getByRole('group', { name: 'SCHEMA_C' });
+    await group.getByRole('button', { name: /SCHEMA_C/ }).click();
+    await expect(group.getByRole('tab')).toHaveCount(1);
+    await expect(group.locator('.tgroup-count')).toHaveText('2');
+    await group.getByRole('button', { name: /SCHEMA_C/ }).click();
+    await expect(group.getByRole('tab')).toHaveCount(2);
+  });
+
+  test('tabs of different schemas are in separate groups', async ({ page }) => {
+    await start(page);
+    await page.keyboard.press('Alt+C');
+    const cm = page.getByRole('dialog', { name: 'Select Connection Profile' });
+    await cm.locator('input[name="profileName"]').fill('OTHER');
+    await cm.locator('input[name="username"]').fill('scott');
+    await cm.locator('input[name="password"]').fill('tiger');
+    await cm.getByRole('button', { name: 'Connect in new tab' }).click();
+    await expect(page.locator('.tb-conn .conn-state.connected')).toBeVisible();
+    await expect(page.getByTestId('tab-group')).toHaveCount(2);
+    await expect(page.getByRole('group', { name: 'OTHER' }).getByRole('tab', { name: /Statement 2/ })).toBeVisible();
+    // One DB Explorer per schema: 2 explorers now.
+    await page.locator('[data-action="dbExplorer"]').click();
+    await page.getByRole('tab', { name: /Statement 1/ }).click();
+    await page.locator('[data-action="dbExplorer"]').click();
+    await expect(page.getByRole('tab', { name: /DB Explorer/ })).toHaveCount(2);
+    // Connect (not "in new tab"): ALL tabs switch to that schema, and only one DB Explorer stays.
+    await page.keyboard.press('Alt+C');
+    await cm.locator('input[name="profileName"]').fill('ALL');
+    await cm.locator('input[name="username"]').fill('scott');
+    await cm.locator('input[name="password"]').fill('tiger');
+    await cm.getByRole('button', { name: 'Connect', exact: true }).click();
+    await expect(cm).toBeHidden();
+    await expect(page.getByTestId('tab-group')).toHaveCount(1);
+    const group = page.getByRole('group', { name: 'ALL' });
+    for (const t of [/Statement 1/, /Statement 2/, /DB Explorer/]) await expect(group.getByRole('tab', { name: t })).toBeVisible();
+    await expect(page.locator('.stab-off')).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: /DB Explorer/ })).toHaveCount(1);
+    // The active explorer stayed and is connected.
+    await expect(group.getByRole('tab', { name: /DB Explorer/ })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('tab groups move to a sidebar and back, like Edge vertical tabs', async ({ page }) => {
+    await start(page);
+    const bar = page.getByTestId('tabbar');
+    const ws = page.locator('.workspace');
+    await expect(bar).toHaveAttribute('aria-orientation', 'horizontal');
+    await page.locator('[data-action="verticalTabs"]').click();
+    await expect(bar).toHaveAttribute('aria-orientation', 'vertical');
+    // Sidebar on the left of the workspace, full height of the work area.
+    const b = (await bar.boundingBox())!;
+    const w = (await ws.boundingBox())!;
+    expect(b.x + b.width).toBeLessThanOrEqual(w.x + 1);
+    expect(Math.abs(b.y - w.y)).toBeLessThan(2);
+    await expect(page.getByTestId('tab-group')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Add tab' }).click();
+    await expect(page.getByRole('tab', { name: /Statement 2/ })).toBeVisible();
+    // Tabs stack under each other.
+    const t1 = (await page.getByRole('tab', { name: /Statement 1/ }).boundingBox())!;
+    const t2 = (await page.getByRole('tab', { name: /Statement 2/ }).boundingBox())!;
+    expect(t2.y).toBeGreaterThan(t1.y);
+    // Drag the right edge: the sidebar gets wider.
+    const edge = page.locator('.tabbar-resize');
+    const e = (await edge.boundingBox())!;
+    await page.mouse.move(e.x + e.width / 2, e.y + 100);
+    await page.mouse.down();
+    await page.mouse.move(e.x + e.width / 2 + 80, e.y + 100, { steps: 4 });
+    await page.mouse.up();
+    expect((await bar.boundingBox())!.width).toBeGreaterThan(b.width + 60);
+    // The shortcut toggles both ways.
+    await page.keyboard.press('Alt+Shift+T');
+    await expect(bar).toHaveAttribute('aria-orientation', 'horizontal');
+    await page.keyboard.press('Alt+Shift+T');
+    await expect(bar).toHaveAttribute('aria-orientation', 'vertical');
+    // The choice survives a reload. The button moves the tabs back to the top.
+    await page.reload();
+    await expect(bar).toHaveAttribute('aria-orientation', 'vertical');
+    await dbLogin(page);
+    await page.locator('[data-action="verticalTabs"]').click();
+    await expect(bar).toHaveAttribute('aria-orientation', 'horizontal');
+  });
 });
 
 test.describe('real backend', () => {

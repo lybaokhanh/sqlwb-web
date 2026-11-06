@@ -235,8 +235,8 @@ export function ConnectionManager({ select }: { select?: string }) {
         <span className="grow" />
         <button type="button" className="btn" onClick={close}>Cancel</button>
         <button type="button" className="btn" disabled={!valid} onClick={() => void save()}>Save</button>
-        <button type="button" className="btn" disabled={!valid} onClick={() => void connect(true)}>Connect in new tab</button>
-        <button type="button" className="btn primary" disabled={!valid} onClick={() => void connect()}>Connect</button>
+        <button type="button" className="btn" disabled={!valid} title="Open a new statement tab with this profile. Other tabs keep their profile." onClick={() => void connect(true)}>Connect in new tab</button>
+        <button type="button" className="btn primary" disabled={!valid} title="All statement tabs and DB Explorers switch to this profile." onClick={() => void connect()}>Connect</button>
       </div>
     </Modal>
   );

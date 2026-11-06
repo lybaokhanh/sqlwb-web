@@ -20,6 +20,9 @@ const P: Record<string, string> = {
   sun: 'M8 5a3 3 0 1 1 0 6 3 3 0 0 1 0-6z M8 1v2 M8 13v2 M1 8h2 M13 8h2 M3 3l1.4 1.4 M11.6 11.6L13 13 M3 13l1.4-1.4 M11.6 4.4L13 3',
   close: 'M4 4l8 8 M12 4l-8 8',
   plus: 'M8 3v10 M3 8h10',
+  down: 'M3 6l5 5 5-5',
+  tabsSide: 'M2 3h12v10H2z M6 3v10 M3.5 5.5h1 M3.5 7.5h1 M3.5 9.5h1',
+  tabsTop: 'M2 3h12v10H2z M2 6h12 M4 4.5h2 M7.5 4.5h2',
 };
 
 export function Icon({ name, size = 16 }: { name: keyof typeof P | string; size?: number }) {

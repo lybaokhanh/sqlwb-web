@@ -442,10 +442,15 @@ test('failed server save: the browser copy restores the work after reload', asyn
 
 test('two browser tabs: the older one gets a conflict dialog, not a silent overwrite', async ({ page, context }) => {
   await start(page);
+  // Wait for the first save (1 s debounce). Else the second tab loads an old version and gets the conflict itself.
+  const ver = () => page.evaluate(() => localStorage.getItem('sqlwb.mock.workspace.ver'));
+  await expect.poll(ver).not.toBeNull();
   const other = await context.newPage();
   await start(other);
+  const before = await ver();
   await typeSql(other, 'select 1 from dual');
-  await other.waitForTimeout(1500);
+  await expect.poll(ver).not.toBe(before);
+  await expect(other.getByRole('dialog')).toBeHidden();
   await typeSql(page, 'select 2 from dual');
   const dlg = page.getByRole('dialog', { name: 'Workspace changed in another browser tab' });
   await expect(dlg).toBeVisible({ timeout: 5000 });

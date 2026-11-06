@@ -11,10 +11,12 @@ import { matchEvent, matchKey } from './shortcuts';
 import { runMacro } from './state/features';
 import { runAction } from './actions';
 import { useStore } from './state/store';
+import { useVerticalTabs } from './tabLayout';
 
 export function App() {
   const ready = useStore((s) => s.ready);
   const auth = useStore((s) => s.auth);
+  const vertical = useVerticalTabs();
 
   useEffect(() => {
     // Capture phase: runs before Monaco, so app shortcuts win.
@@ -46,8 +48,11 @@ export function App() {
     <div className="app">
       <MenuBar />
       <Toolbar />
-      <TabBar />
-      <Workspace />
+      {/* Same tree in both tab layouts: only CSS changes, so Monaco does not remount. */}
+      <div className={`app-main${vertical ? ' side-tabs' : ''}`}>
+        <TabBar />
+        <Workspace />
+      </div>
       <StatusBar />
       <Dialogs />
       {auth === 'login' && <LoginScreen overlay />}

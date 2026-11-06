@@ -47,7 +47,7 @@ export function Workspace() {
           </>
         )}
       </div>
-      {explorer && tab && <ExplorerView key={tab.id} tab={tab} />}
+      {explorer && tab && <ExplorerView key={`${tab.id}:${tab.profileId}`} tab={tab} />}
     </div>
   );
 }

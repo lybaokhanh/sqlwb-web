@@ -8,7 +8,7 @@ export type ActionId =
   | 'saveWorkspace' | 'loadWorkspace' | 'exit'
   | 'undo' | 'redo' | 'find' | 'replace' | 'toggleComment' | 'lowerCase' | 'upperCase'
   | 'matchBracket' | 'gotoLine' | 'commandPalette'
-  | 'focusEditor' | 'sqlEditor' | 'focusMaxRows' | 'expandEditor' | 'toggleTheme'
+  | 'focusEditor' | 'sqlEditor' | 'focusMaxRows' | 'expandEditor' | 'toggleTheme' | 'verticalTabs'
   | 'saveChanges' | 'insertRow' | 'copyRow' | 'deleteRow' | 'filter' | 'findInData'
   | 'copyData' | 'copyAsInsert' | 'saveDataAs' | 'optimizeWidths' | 'closeResult' | 'bookmarks' | 'loadRun'
   | 'execCurrent' | 'execSelected' | 'execAll' | 'cancel' | 'reformat' | 'completion'
@@ -56,6 +56,7 @@ export const ACTIONS: ActionDef[] = [
   { id: 'focusMaxRows', label: 'Max. rows field', keys: ['F7'] },
   { id: 'expandEditor', label: 'Expand editor', keys: ['Ctrl+Shift+D'] },
   { id: 'toggleTheme', label: 'Toggle dark / light theme' },
+  { id: 'verticalTabs', label: 'Tabs on the side (vertical tabs)', keys: ['Ctrl+Shift+,', 'Alt+Shift+T'] },
   // Data
   { id: 'saveChanges', label: 'Save changes to database' },
   { id: 'insertRow', label: 'Insert row' },
@@ -108,7 +109,7 @@ interface Chord { ctrl: boolean; shift: boolean; alt: boolean; code: string }
 
 const NAMED: Record<string, string> = {
   Enter: 'Enter', Tab: 'Tab', Space: 'Space', Left: 'ArrowLeft', Right: 'ArrowRight',
-  Up: 'ArrowUp', Down: 'ArrowDown', PageDown: 'PageDown', PageUp: 'PageUp', Esc: 'Escape',
+  Up: 'ArrowUp', Down: 'ArrowDown', PageDown: 'PageDown', PageUp: 'PageUp', Esc: 'Escape', ',': 'Comma',
 };
 
 function parse(key: string): Chord {

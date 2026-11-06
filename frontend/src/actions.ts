@@ -3,6 +3,7 @@ import type { ActionId } from './shortcuts';
 import { client } from './api/client';
 import { editorBridge } from './editor/bridge';
 import { toggleTheme } from './theme';
+import { toggleVerticalTabs } from './tabLayout';
 import { saveNow } from './state/persist';
 import { logout } from './boot';
 import {
@@ -92,6 +93,7 @@ const handlers: Partial<Record<ActionId, Handler>> = {
     else updateTab(t.id, { prevSplit: t.split, split: 1 });
   },
   toggleTheme,
+  verticalTabs: toggleVerticalTabs,
   filter: () => {
     const t = activeTab();
     if (t) updateTab(t.id, { filterOpen: !t.filterOpen });

@@ -137,14 +137,31 @@ kbd { font: 11px var(--font-mono); color: var(--fg-muted); }
   scrollbar-width: none;
 }
 .stab {
-  position: relative; display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 6px 0 12px;
+  position: relative; display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 6px 0 8px;
   border: 1px solid transparent; border-bottom: 0; border-radius: 5px 5px 0 0;
   color: var(--fg-muted); white-space: nowrap; user-select: none; flex: none;
 }
-.stab::before {
-  content: ''; position: absolute; left: 0; top: 3px; bottom: 3px; width: 4px;
-  background: var(--band); border-radius: 2px;
+/* Schema group: header chip + its tabs, framed in the profile color. */
+.tgroup {
+  display: flex; align-items: flex-end; gap: 2px; flex: none; height: 28px; padding: 0 2px 0 0;
+  border: 1px solid var(--border); border-bottom: 0; border-top: 2px solid var(--band); border-radius: 5px 5px 0 0;
+  background: color-mix(in srgb, var(--band) 6%, transparent);
 }
+.tgroup + .tgroup { margin-left: 4px; }
+.tgroup-head {
+  align-self: center; display: flex; align-items: center; gap: 4px; height: 20px; max-width: 160px;
+  margin: 0 2px 0 4px; padding: 0 6px 0 4px; border: 0; border-radius: 3px;
+  background: color-mix(in srgb, var(--band) 18%, transparent); color: var(--fg);
+  font-size: 11px; font-weight: 600; white-space: nowrap; flex: none;
+}
+.tgroup-head:hover { background: color-mix(in srgb, var(--band) 30%, transparent); }
+.tgroup-name { overflow: hidden; text-overflow: ellipsis; }
+.tgroup-count {
+  min-width: 16px; padding: 0 4px; border-radius: 8px; text-align: center;
+  background: var(--bg-panel); color: var(--fg-muted); font-weight: 500;
+}
+.tgroup.collapsed { padding-right: 0; }
+.stab-off { width: 6px; height: 6px; border-radius: 50%; background: var(--fg-faint); flex: none; }
 .stab:hover { background: var(--bg-hover); color: var(--fg); }
 .stab.active {
   background: var(--bg-panel); color: var(--fg); border-color: var(--border);
@@ -162,6 +179,55 @@ kbd { font: 11px var(--font-mono); color: var(--fg-muted); }
   border: 0; border-radius: 4px; background: none; color: var(--fg-muted); flex: none;
 }
 .stab-add:hover { background: var(--bg-hover); color: var(--fg); }
+.tabbar-groups { display: contents; }
+.stab-layout {
+  align-self: center; width: 24px; height: 22px; display: grid; place-items: center; margin-right: 4px;
+  border: 0; border-radius: 4px; background: none; color: var(--fg-muted); flex: none;
+}
+.stab-layout:hover { background: var(--bg-hover); color: var(--fg); }
+
+/* ---- Tab layout: strip on top (default) or sidebar on the left (vertical tabs, like Edge) ---- */
+.app-main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.app-main.side-tabs { flex-direction: row; }
+.app-main.side-tabs > .workspace { min-width: 0; }
+.tabbar.vertical {
+  position: relative; flex: none; flex-direction: column; align-items: stretch; height: auto; padding: 0;
+  gap: 0; border-bottom: 0; border-right: 1px solid var(--border); overflow: hidden;
+}
+.tabbar.vertical .tabbar-head {
+  display: flex; align-items: center; justify-content: space-between; height: 28px; padding: 0 2px 0 10px;
+  border-bottom: 1px solid var(--border); color: var(--fg-muted); font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em; flex: none;
+}
+.tabbar.vertical .stab-layout { margin-right: 0; }
+.tabbar.vertical .tabbar-groups {
+  display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; padding: 6px;
+  overflow-y: auto; scrollbar-width: thin;
+}
+.tabbar.vertical .tgroup {
+  flex-direction: column; align-items: stretch; height: auto; gap: 1px; padding: 2px 2px 3px;
+  border: 1px solid var(--border); border-left: 3px solid var(--band); border-radius: 4px;
+}
+.tabbar.vertical .tgroup + .tgroup { margin-left: 0; }
+.tabbar.vertical .tgroup-head { align-self: stretch; max-width: none; height: 22px; margin: 0 0 1px; }
+.tabbar.vertical .tgroup-name { flex: 1; text-align: left; }
+.tabbar.vertical .stab {
+  height: 24px; padding: 0 2px 0 18px; border: 0; border-radius: 3px;
+}
+.tabbar.vertical .stab-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tabbar.vertical .stab-edit { flex: 1; width: auto; min-width: 0; }
+.tabbar.vertical .stab.active {
+  margin-bottom: 0; height: 24px; background: var(--bg-panel); box-shadow: inset 2px 0 0 var(--accent);
+}
+.tabbar.vertical .stab-add {
+  align-self: stretch; width: auto; display: flex; align-items: center; gap: 6px; padding: 0 8px; height: 26px;
+  font-size: 12px;
+}
+.tabbar-resize {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 5px; cursor: col-resize; z-index: 2;
+}
+.tabbar-resize:hover { background: var(--accent-soft); }
+body.resizing-x { cursor: col-resize; user-select: none; }
 
 /* ---- Workspace ---- */
 .workspace { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--bg-panel); }
