@@ -11,7 +11,7 @@ export type ActionId =
   | 'focusEditor' | 'sqlEditor' | 'focusMaxRows' | 'expandEditor' | 'toggleTheme' | 'verticalTabs'
   | 'saveChanges' | 'insertRow' | 'copyRow' | 'deleteRow' | 'filter' | 'findInData'
   | 'copyData' | 'copyAsInsert' | 'saveDataAs' | 'optimizeWidths' | 'closeResult' | 'bookmarks' | 'loadRun'
-  | 'execCurrent' | 'execSelected' | 'execAll' | 'cancel' | 'reformat' | 'completion'
+  | 'execCurrent' | 'execSelected' | 'execAll' | 'cancel' | 'reformat' | 'completion' | 'autoCompletion'
   | 'jumpToStatement' | 'commit' | 'rollback'
   | 'histFirst' | 'histBack' | 'histNext' | 'histLast'
   | 'manageMacros' | 'runMacro' | 'dbExplorer' | 'files' | 'options' | 'shortcutList' | 'about';
@@ -76,6 +76,7 @@ export const ACTIONS: ActionDef[] = [
   { id: 'cancel', label: 'Cancel' },
   { id: 'reformat', label: 'Reformat SQL', keys: ['Ctrl+R'] },
   { id: 'completion', label: 'Code completion', keys: ['Ctrl+Space'], native: true },
+  { id: 'autoCompletion', label: 'Auto completion while typing (on / off)' },
   { id: 'jumpToStatement', label: 'Jump to statement #...', keys: ['Ctrl+J'] },
   { id: 'commit', label: 'Commit', keys: ['Alt+M'] },
   { id: 'rollback', label: 'Rollback', keys: ['Alt+R'] },

@@ -9,7 +9,7 @@ export const MENUS: Menu[] = [
   { title: 'Edit', items: ['undo', 'redo', '-', 'find', 'replace', '-', 'toggleComment', 'lowerCase', 'upperCase', 'matchBracket', 'gotoLine', '-', 'commandPalette'] },
   { title: 'View', items: ['nextTab', 'prevTab', '-', 'focusEditor', 'sqlEditor', 'focusMaxRows', 'expandEditor', '-', 'verticalTabs', 'toggleTheme'] },
   { title: 'Data', items: ['saveChanges', 'insertRow', 'copyRow', 'deleteRow', '-', 'filter', 'findInData', '-', 'copyData', 'copyAsInsert', 'saveDataAs', '-', 'optimizeWidths', '-', 'closeResult'] },
-  { title: 'SQL', items: ['execCurrent', 'execSelected', 'execAll', 'cancel', '-', 'reformat', 'completion', 'jumpToStatement', '-', 'commit', 'rollback', '-', 'histFirst', 'histBack', 'histNext', 'histLast'] },
+  { title: 'SQL', items: ['execCurrent', 'execSelected', 'execAll', 'cancel', '-', 'reformat', 'completion', 'autoCompletion', 'jumpToStatement', '-', 'commit', 'rollback', '-', 'histFirst', 'histBack', 'histNext', 'histLast'] },
   { title: 'Macros', items: ['manageMacros', 'runMacro'], dynamic: 'macros' },
   { title: 'Workspace', items: ['saveWorkspace', 'loadWorkspace', '-', 'renameTab'] },
   { title: 'Tools', items: ['dbExplorer', 'files', 'bookmarks', 'loadRun', '-', 'options', 'commandPalette'] },

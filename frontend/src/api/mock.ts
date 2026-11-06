@@ -32,7 +32,13 @@ function columns(): ColumnInfo[] {
   return cols;
 }
 
-function row(i: number): unknown[] {
+/** "select ... json": one more column PAYLOAD with JSON (cell dialog tests). */
+const JSON_COL: ColumnInfo = { name: 'PAYLOAD', typeName: 'CLOB', jdbcType: 2005, nullable: true };
+function jsonValue(i: number): string {
+  return JSON.stringify({ id: i + 1, tags: ['a', 'b'], owner: { name: `User ${i + 1}`, active: i % 2 === 0 } });
+}
+
+function row(i: number, json = false): unknown[] {
   const r: unknown[] = [i + 1];
   for (let c = 1; c < COLS; c++) {
     const kind = c % 4;
@@ -42,6 +48,7 @@ function row(i: number): unknown[] {
     else if (kind === 2) r.push(new Date(Date.UTC(2020, 0, 1) + ((i * 86400000) % 2e11)).toISOString().slice(0, 19).replace('T', ' '));
     else r.push(`C${(i * 13 + c) % 997}`);
   }
+  if (json) r.push(jsonValue(i));
   return r;
 }
 
@@ -124,7 +131,7 @@ export class MockServer {
         }
         const end = Math.min(r.total, msg.offset + msg.count);
         const rows: unknown[][] = [];
-        for (let i = msg.offset; i < end; i++) rows.push(row(i));
+        for (let i = msg.offset; i < end; i++) rows.push(row(i, r.cols.includes(JSON_COL)));
         this.later({ type: 'rows', tabId: msg.tabId, resultId: msg.resultId, offset: msg.offset, rows, done: end >= r.total, total: r.total }, 5);
         break;
       }
@@ -228,12 +235,13 @@ export class MockServer {
         let total = num ? parseInt(num[0], 10) : 50;
         if (m.maxRows > 0) total = Math.min(total, m.maxRows);
         const resultId = `m${++this.seq}`;
-        const cols = columns();
+        const json = /\bjson\b/i.test(sql);
+        const cols = json ? [...columns(), JSON_COL] : columns();
         this.results.set(resultId, { tabId, total, cols });
         this.emit({ type: 'resultMeta', tabId, reqId, resultId, sql, columns: cols });
         const first = Math.min(FIRST_PAGE_ROWS, total);
         const rows: unknown[][] = [];
-        for (let i = 0; i < first; i++) rows.push(row(i));
+        for (let i = 0; i < first; i++) rows.push(row(i, json));
         const done = first >= total;
         this.emit({ type: 'rows', tabId, resultId, offset: 0, rows, done, total: done ? total : -1 });
         this.emit({ type: 'message', tabId, reqId, level: 'info', text: `${total} rows retrieved` });

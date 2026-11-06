@@ -4,6 +4,7 @@ import { client } from './api/client';
 import { editorBridge } from './editor/bridge';
 import { toggleTheme } from './theme';
 import { toggleVerticalTabs } from './tabLayout';
+import { isAutoComplete, toggleAutoComplete } from './editor/autoComplete';
 import { saveNow } from './state/persist';
 import { logout } from './boot';
 import {
@@ -152,6 +153,11 @@ const handlers: Partial<Record<ActionId, Handler>> = {
     });
   },
   completion: () => ed().run('editor.action.triggerSuggest'),
+  autoCompletion: () => {
+    toggleAutoComplete();
+    const t = activeTab();
+    if (t) log(t.id, 'info', `Auto completion while typing: ${isAutoComplete() ? 'on' : 'off (Ctrl+Space still works)'}`);
+  },
   jumpToStatement: () => {
     const t = activeTab();
     if (!t) return;

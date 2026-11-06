@@ -10,6 +10,7 @@ import { isEnabled, runAction } from '../actions';
 import { startUpdate } from '../boot';
 import { BookmarksDialog, ConfirmDialog, ExportDialog, FilesDialog, KeysDialog, MacrosDialog, Modal } from './FeatureDialogs';
 import { ConnectionManager } from "./ConnectionManager";
+import { CellDialog } from './CellDialog';
 import { upsertProfile } from "../state/profiles";
 
 const close = () => useStore.setState({ dialog: null });
@@ -164,6 +165,7 @@ export function Dialogs() {
       {d?.kind === 'bookmarks' && <BookmarksDialog />}
       {d?.kind === 'files' && <FilesDialog />}
       {d?.kind === 'export' && <ExportDialog d={d} />}
+      {d?.kind === 'cell' && <CellDialog key={`${d.resultId}:${d.row}:${d.col}`} d={d} />}
       {palette && <CommandPalette />}
     </>
   );

@@ -12,7 +12,9 @@ const chromePaths = [
 const channel = process.env.PW_CHANNEL ?? (chromePaths.some((p) => existsSync(p)) ? 'chrome' : 'msedge');
 
 // PW_BASE_URL lets the tests run against the container (e.g. http://localhost:8484).
-const baseURL = process.env.PW_BASE_URL ?? 'http://localhost:4173';
+// PW_PORT: port of the local preview server (default 4173).
+const port = process.env.PW_PORT ?? '4173';
+const baseURL = process.env.PW_BASE_URL ?? `http://localhost:${port}`;
 
 export default defineConfig({
   testDir: 'tests',
@@ -30,8 +32,8 @@ export default defineConfig({
   webServer: process.env.PW_BASE_URL
     ? undefined
     : {
-        command: 'npm run preview -- --port 4173 --strictPort',
-        url: 'http://localhost:4173',
+        command: `npm run preview -- --port ${port} --strictPort`,
+        url: `http://localhost:${port}`,
         reuseExistingServer: false,
         timeout: 60_000,
       },

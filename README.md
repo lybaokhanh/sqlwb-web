@@ -18,6 +18,8 @@ flowchart LR
 |---|---|---|
 | Backend | Java 21, Javalin, virtual threads, ZGC | Uses the jar directly. Any JDBC driver. Short GC pauses |
 | Frontend | React, Monaco, own virtual grid | Smooth with 100k rows |
+| Result grid | Header click sorts the loaded rows (ascending, descending, off; NULL last). Double-click on a long value (JSON, XML, multi-line text) opens it formatted in an editor | Sort covers loaded rows only: use "Fetch all" or `ORDER BY` for the full result. CLOBs over 32,768 characters open read-only |
+| Completion | Opens while typing, after `.`, and after `FROM `/`JOIN `/`WHERE ` etc.: tables and columns from the jar, keywords, functions, snippets. SQL → "Auto completion while typing" turns it off | Ctrl+Space always works |
 | Transport | One WebSocket per browser tab, server sends JSON arrays every 25 ms | Thousands of statements do not flood the browser |
 | Sessions | Cookie (30 days, renewed while used) + app login. Sessions are stored in SQLite (cookie hash, profile key encrypted with a key from the cookie value) | A browser restart or a deploy does not ask for the app login again |
 | Saved work | `/api/workspace` in SQLite, per user, with a version (`X-Workspace-Version`, HTTP 409 on conflict) | Tabs, SQL, cursor, macros come back. Passwords are removed from the workspace |

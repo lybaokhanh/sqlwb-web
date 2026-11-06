@@ -300,6 +300,18 @@ body.resizing-x { cursor: col-resize; user-select: none; }
 }
 .cell.head.num { text-align: right; }
 .head-name { pointer-events: none; }
+.cell.head.sortable { cursor: pointer; user-select: none; }
+.cell.head.sortable:hover { background: var(--bg-hover); }
+.cell.head.sorted { padding-right: 18px; color: var(--accent); }
+.sort-ind { position: absolute; right: 6px; top: 0; font-size: 9px; pointer-events: none; }
+/* Cell dialog (long values: JSON, XML, text) */
+.cell-dlg { display: flex; flex-direction: column; gap: 8px; min-height: 0; flex: 1; }
+.cell-dlg-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cell-dlg-bar select { height: 24px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--bg-input); color: var(--fg); }
+.cell-dlg-bar .grow { flex: 1; }
+.cell-dlg-host { flex: 1; min-height: 240px; height: min(560px, calc(100vh - 220px)); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.cell-dlg-note { font-size: 12px; color: var(--fg-muted); }
+.cell-dlg-note.err { color: var(--err); }
 .col-resize { position: absolute; right: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 1; }
 .col-resize:hover { background: var(--accent-soft); }
 .cell.rownum {

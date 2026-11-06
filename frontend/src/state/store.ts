@@ -62,6 +62,8 @@ export interface ResultSet {
   table?: string;
   /** Selected row index. */
   sel?: number;
+  /** Client-side sort of the loaded rows (header click). dir 1 = ascending, -1 = descending. */
+  sort?: { col: number; dir: 1 | -1 };
 }
 
 export interface LoadRun {
@@ -135,7 +137,8 @@ export type Dialog =
   | { kind: 'macros' }
   | { kind: 'bookmarks' }
   | { kind: 'files' }
-  | { kind: 'export'; tabId: string; resultId: string };
+  | { kind: 'export'; tabId: string; resultId: string }
+  | { kind: 'cell'; tabId: string; resultId: string; row: number; col: number };
 
 export type AuthState = 'checking' | 'login' | 'ready';
 

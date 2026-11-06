@@ -484,3 +484,72 @@ test('Connect switches the current statement tab; Connect in new tab adds one', 
   await dlg.getByRole('button', { name: 'Connect in new tab' }).click();
   await expect(page.getByRole('tab', { name: /Statement 2/ })).toHaveAttribute('aria-selected', 'true');
 });
+
+test('header click sorts: ascending, descending, off; NULL last', async ({ page }) => {
+  await start(page);
+  await typeSql(page, 'select 30 from emp');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByTestId('row-info')).toHaveText('30 rows');
+  const firstId = () => page.locator('.grid-row').first().locator('.cell').nth(1).textContent();
+  const head = page.getByTestId('head-0');
+  await head.click();
+  await expect(head).toHaveAttribute('aria-sort', 'ascending');
+  expect(await firstId()).toBe('1');
+  await head.click();
+  await expect(head).toHaveAttribute('aria-sort', 'descending');
+  expect(await firstId()).toBe('30');
+  // Row number shows the load order, so the edit and delete target the right row
+  await expect(page.locator('.grid-row').first().locator('.cell.rownum')).toHaveText('30');
+  await head.click();
+  await expect(head).toHaveAttribute('aria-sort', 'none');
+  expect(await firstId()).toBe('1');
+  // AMOUNT_4 is numeric: 10 < 9.5 must not happen; NULL is last
+  const amount = page.getByTestId('head-4');
+  await amount.click();
+  const vals = await page.locator('.grid-row').evaluateAll((rows) => rows
+    .sort((a, b) => parseFloat((a as HTMLElement).style.top) - parseFloat((b as HTMLElement).style.top))
+    .map((r) => r.querySelectorAll('.cell')[5]?.textContent ?? ''));
+  const nums = vals.filter((v) => v !== 'NULL').map(Number);
+  expect(nums).toEqual([...nums].sort((a, b) => a - b));
+  const firstNull = vals.indexOf('NULL');
+  if (firstNull >= 0) expect(vals.slice(firstNull).every((v) => v === 'NULL')).toBe(true);
+});
+
+test('double-click on a JSON cell opens the formatted value; Apply writes it back compact', async ({ page }) => {
+  await start(page);
+  await typeSql(page, 'select 5 from emp where json = 1');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByTestId('row-info')).toHaveText('5 rows');
+  const cell = page.locator('.grid-row').first().locator('.cell').last();
+  await cell.dblclick();
+  const dlg = page.getByTestId('cell-dialog');
+  await expect(dlg).toBeVisible();
+  await expect(dlg.getByLabel('Language')).toHaveValue('json');
+  // Pretty: the nested object is on its own lines
+  await expect(dlg.locator('.view-line', { hasText: '"owner": {' })).toBeVisible();
+  await dlg.locator('.view-line', { hasText: '"id": 1,' }).click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.type('00');
+  await dlg.getByRole('button', { name: 'Apply to grid' }).click();
+  await expect(dlg).toBeHidden();
+  await expect(page.locator('.cell.changed')).toHaveText('{"id":100,"tags":["a","b"],"owner":{"name":"User 1","active":true}}');
+  // Short values still edit inline
+  await page.locator('.grid-row').first().locator('.cell').nth(2).dblclick();
+  await expect(page.locator('.cell-input')).toBeVisible();
+});
+
+test('auto completion: keywords while typing in the typed case, tables after FROM without Ctrl+Space', async ({ page }) => {
+  await start(page);
+  const box = page.locator('.suggest-widget');
+  await typeSql(page, 'sel');
+  await expect(box.locator('.monaco-list-row').first()).toContainText('select');
+  await page.keyboard.press('Tab');
+  await page.keyboard.type(' * from ');
+  await expect(box).toContainText('DEPARTMENTS');
+  await expect(box).not.toContainText('ORDER BY');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.monaco-editor .view-lines')).toContainText('select * from');
+});

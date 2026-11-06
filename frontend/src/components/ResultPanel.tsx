@@ -51,6 +51,7 @@ export function ResultPanel({ tab }: { tab: Tab }) {
           <span className="rinfo" data-testid="row-info">
             {active.done || active.closed ? `${active.rowCount} rows`
               : active.fetchAll ? `${active.rowCount} rows (fetching...)` : `${active.rowCount} rows loaded, more on scroll`}
+            {active.sort && !active.done && !active.closed ? ' · sort covers loaded rows' : ''}
           </span>
         )}
         {active && !active.done && !active.closed && !active.fetchAll && (
