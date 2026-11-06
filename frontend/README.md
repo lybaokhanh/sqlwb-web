@@ -29,6 +29,7 @@ npx playwright test          # exit 0, uses installed Chrome or Edge, never down
 - Against the container: `PW_BASE_URL=http://localhost:8484 npx playwright test`.
 - `PW_CHANNEL=chrome|msedge` picks the browser.
 - Screenshots go to `tests/screenshots/`.
+- Demo images for `docs/features/`: `npm run docs:images` (config `playwright.docs.config.ts`, writes `../docs/images/`). Port 4173 in use: `PW_PORT=4199 npx playwright test -c playwright.docs.config.ts`.
 
 ## Layout
 

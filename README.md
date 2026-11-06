@@ -4,6 +4,10 @@ A multi-user web version of [SQL Workbench/J](https://www.sql-workbench.eu/). It
 
 Not affiliated with the SQL Workbench/J project.
 
+![sqlwb-web](docs/images/sql-editor.png)
+
+Features with demo images: [docs/features/](docs/features/README.md). Changes per version: [CHANGELOG.md](CHANGELOG.md).
+
 ## Architecture
 
 ```mermaid
@@ -77,6 +81,9 @@ Template for a site: [config.example/](config.example/).
 | `scripts/bench.mjs` | Benchmark against a real DB |
 | `.github/workflows/docker.yml` | Image build; tag `v*` pushes to GHCR |
 | [docs/benchmarks.md](docs/benchmarks.md) | Benchmark results |
+| [docs/features/](docs/features/README.md), `docs/images/` | Feature docs and demo images ([CONTRIBUTING.md](CONTRIBUTING.md#feature-docs-and-releases)) |
+| `CHANGELOG.md`, `.github/workflows/release.yml` | Release notes per version |
+| `scripts/check-docs.mjs`, `.github/workflows/docs.yml` | Docs check: a `feat` needs doc, image and changelog entry |
 
 ## License
 

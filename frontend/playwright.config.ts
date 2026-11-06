@@ -18,6 +18,7 @@ const baseURL = process.env.PW_BASE_URL ?? `http://localhost:${port}`;
 
 export default defineConfig({
   testDir: 'tests',
+  testIgnore: 'docs/**', // demo images: playwright.docs.config.ts
   workers: 1,
   fullyParallel: false,
   timeout: 60_000,
