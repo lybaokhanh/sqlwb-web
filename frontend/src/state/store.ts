@@ -3,7 +3,7 @@
 // script with thousands of statements does not re-render thousands of times.
 import { create } from 'zustand';
 import type {
-  ColumnInfo, CompletionMsg, ConnectionInfo, ExecMode, LoadStats, Macro, ProfileOptions, ServerMsg, SessionResponse, UpdateInfo,
+  ColumnInfo, CompletionMsg, ConnectionInfo, ExecMode, LoadStats, Macro, KeyMap, ProfileOptions, ServerMsg, SessionResponse, UpdateInfo,
 } from '../api/protocol';
 import { PROFILE_OPTION_KEYS } from '../api/protocol';
 import { singleTable } from '../sql/table';
@@ -160,6 +160,8 @@ interface State {
   /** JDBC URL of the default profile (from /api/config). */
   defaultUrl: string;
   macros: Macro[];
+  /** User key overrides: platform -> action id -> keys. Saved in the workspace. */
+  keys: KeyMap;
 }
 
 export const DEFAULT_PROFILE_ID = 'default';
@@ -225,6 +227,7 @@ export const useStore = create<State>(() => ({
   ready: false,
   defaultUrl: '',
   macros: [],
+  keys: {},
 }));
 
 const get = useStore.getState;

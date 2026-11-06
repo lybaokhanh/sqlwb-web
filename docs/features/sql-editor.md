@@ -14,13 +14,19 @@ Since: v0.1.0
 
 ## Shortcuts
 
-| Action | Keys |
-|---|---|
-| Execute Current | Ctrl+Enter |
-| Execute Selected | Ctrl+E |
-| Execute All | Ctrl+Shift+E |
-| Reformat SQL | Ctrl+R |
-| Commit / Rollback | Alt+M / Alt+R |
-| History back / next | Alt+Left / Alt+Right |
-| Jump to statement | Ctrl+J |
-| All shortcuts | Help → Keyboard shortcuts |
+| Action | Windows / Linux | macOS |
+|---|---|---|
+| Execute Current | Ctrl+Enter | ⌘↩ |
+| Execute Selected | Ctrl+E | ⌘E |
+| Execute All | Ctrl+Shift+E | ⇧⌘E |
+| Reformat SQL | Ctrl+R | ⌘R |
+| Code completion | Ctrl+Space | ⌃Space |
+| Commit / Rollback | Alt+M / Alt+R | ⌥M / ⌥R |
+| History back / next | Alt+Left / Alt+Right | ⌃⌥↑ / ⌃⌥↓ |
+| Jump to statement | Ctrl+J | ⌘J |
+| All shortcuts | Help → Keyboard shortcuts | Help → Keyboard shortcuts |
+
+## Change keys
+
+Open Help → Keyboard shortcuts. Click **+ Add** in the row of the action and press the new key.
+The workspace saves the keys, per OS. Details: [Keyboard shortcuts](keyboard-shortcuts.md).

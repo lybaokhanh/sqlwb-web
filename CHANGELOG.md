@@ -8,6 +8,10 @@ Rules: [CONTRIBUTING.md](CONTRIBUTING.md#feature-docs-and-releases).
 
 ### Added
 
+- **Keyboard shortcuts per OS, change keys**: hotkeys work in a normal browser tab on Windows, macOS (⌘) and Linux. Menus show only keys that the browser lets through. Help → Keyboard shortcuts changes the keys. The workspace saves them per OS. [Docs](docs/features/keyboard-shortcuts.md)
+
+  ![Keyboard shortcuts](docs/images/keyboard-shortcuts.png)
+
 - **Resizable dialogs**: drag the corner grip. The browser keeps the size per dialog kind. Double-click the grip for the default size. [Docs](docs/features/workspace.md#dialog-size)
 
 ### Fixed

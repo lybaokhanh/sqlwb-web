@@ -619,3 +619,120 @@ test('dialog size: drag the grip, size stays after reopen and reload, double-cli
   expect(await size()).toEqual(def);
   expect(await page.evaluate(() => localStorage.getItem('sqlwb.dialogSize.connections'))).toBeNull();
 });
+
+// ---- Hotkeys per OS and the key editor ----
+
+/** Makes the app think it runs on another OS. */
+async function emulateOs(page: Page, platform: string) {
+  await page.addInitScript((p) => {
+    Object.defineProperty(Navigator.prototype, 'platform', { get: () => p });
+    Object.defineProperty(Navigator.prototype, 'userAgentData', { get: () => undefined });
+  }, platform);
+}
+
+async function menuKey(page: Page, title: string, item: string) {
+  await page.locator('.menu-title', { hasText: new RegExp(`^${title}$`) }).click();
+  const key = await page.locator('.menu-item', { hasText: item }).first().locator('.menu-key').textContent();
+  await page.keyboard.press('Escape');
+  return key;
+}
+
+async function openKeyEditor(page: Page) {
+  await menu(page, 'Help', 'Keyboard shortcuts');
+  const dlg = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(dlg.getByTestId('key-editor')).toBeVisible();
+  return dlg;
+}
+
+test('macOS: menus show Mac keys and Cmd+Enter runs the statement', async ({ page }) => {
+  await emulateOs(page, 'MacIntel');
+  await start(page);
+  expect(await menuKey(page, 'SQL', 'Execute Current')).toBe('⌘↩');
+  expect(await menuKey(page, 'SQL', 'Execute All')).toBe('⇧⌘E');
+  expect(await menuKey(page, 'File', 'Add tab')).toBe('⌥T');
+  expect(await menuKey(page, 'Macros', 'Manage macros')).toBe('⇧⌘M');
+  await typeSql(page, 'select 7');
+  await page.keyboard.press('Meta+Enter');
+  await expect(page.getByTestId('row-info')).toHaveText('7 rows');
+  const dlg = await openKeyEditor(page);
+  await expect(dlg.getByTestId('key-note')).toContainText('macOS');
+});
+
+test('Linux: Ctrl keys, browser keys are not shown', async ({ page }) => {
+  await emulateOs(page, 'Linux x86_64');
+  await start(page);
+  expect(await menuKey(page, 'SQL', 'Execute Current')).toBe('Ctrl+Enter');
+  expect(await menuKey(page, 'File', 'Add tab')).toBe('Alt+T');
+  expect(await menuKey(page, 'View', 'Next tab')).toBe('Alt+PageDown');
+  const dlg = await openKeyEditor(page);
+  await expect(dlg.getByTestId('key-note')).toContainText('Linux');
+});
+
+test('key editor: change Execute Current, the new key runs it, reload keeps it, Reset restores', async ({ page }) => {
+  await start(page);
+  let dlg = await openKeyEditor(page);
+  let row = dlg.getByTestId('key-row-execCurrent');
+  await expect(row.getByTestId('key-chip')).toHaveText(['Ctrl+Enter×']);
+  await row.getByTestId('key-remove').click();
+  await expect(row.getByTestId('key-chip')).toHaveCount(0);
+  await row.getByTestId('key-add').click();
+  await expect(row.getByTestId('key-recording')).toHaveText('Press keys... (Esc cancels)');
+  // Escape stops the recording. The dialog stays open.
+  await page.keyboard.press('Escape');
+  await expect(row.getByTestId('key-recording')).toHaveCount(0);
+  await expect(dlg).toBeVisible();
+  await row.getByTestId('key-add').click();
+  await page.keyboard.press('Shift'); // modifier only: ignored
+  await expect(row.getByTestId('key-recording')).toBeVisible();
+  await page.keyboard.press('Alt+X');
+  await expect(row.getByTestId('key-chip')).toHaveAttribute('data-key', 'Alt+X');
+  await expect(row.getByTestId('key-reset')).toBeVisible();
+  await dlg.getByRole('button', { name: 'Close' }).click();
+  await expect(dlg).toBeHidden();
+  expect(await menuKey(page, 'SQL', 'Execute Current')).toBe('Alt+X');
+  await typeSql(page, 'select 7');
+  await page.keyboard.press('Alt+X');
+  await expect(page.getByTestId('row-info')).toHaveText('7 rows');
+  await page.waitForTimeout(1500); // debounce 1 s
+  await page.reload();
+  await dbLogin(page);
+  expect(await menuKey(page, 'SQL', 'Execute Current')).toBe('Alt+X');
+  dlg = await openKeyEditor(page);
+  row = dlg.getByTestId('key-row-execCurrent');
+  await row.getByTestId('key-reset').click();
+  await expect(row.getByTestId('key-chip')).toHaveText(['Ctrl+Enter×']);
+  await expect(row.getByTestId('key-reset')).toHaveCount(0);
+  await dlg.getByRole('button', { name: 'Close' }).click();
+  expect(await menuKey(page, 'SQL', 'Execute Current')).toBe('Ctrl+Enter');
+});
+
+test('key editor: a reserved browser key is rejected', async ({ page }) => {
+  await start(page);
+  const dlg = await openKeyEditor(page);
+  const row = dlg.getByTestId('key-row-newTab');
+  await expect(row.getByTestId('key-chip')).toHaveText(['Alt+T×']);
+  await row.getByTestId('key-add').click();
+  await page.keyboard.press('Control+T');
+  await expect(row.getByTestId('key-msg')).toContainText('The browser or OS keeps this key');
+  await expect(row.getByTestId('key-recording')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(row.getByTestId('key-recording')).toHaveCount(0);
+  await expect(row.getByTestId('key-chip')).toHaveText(['Alt+T×']);
+  await expect(dlg).toBeVisible();
+});
+
+test('key editor: a key of another action moves to this action', async ({ page }) => {
+  await start(page);
+  const dlg = await openKeyEditor(page);
+  await dlg.getByTestId('key-filter').fill('execute');
+  await expect(dlg.locator('.key-row')).toHaveCount(3);
+  const all = dlg.getByTestId('key-row-execAll');
+  await all.getByTestId('key-add').click();
+  await page.keyboard.press('Control+E');
+  await expect(all.getByTestId('key-msg')).toHaveText('Ctrl+E: Moved from Execute Selected.');
+  await expect(all.getByTestId('key-chip')).toHaveText(['Ctrl+Shift+E×', 'Ctrl+E×']);
+  await expect(dlg.getByTestId('key-row-execSelected').getByTestId('key-chip')).toHaveCount(0);
+  await dlg.getByTestId('key-reset-all').click();
+  await expect(all.getByTestId('key-chip')).toHaveText(['Ctrl+Shift+E×']);
+  await expect(dlg.getByTestId('key-row-execSelected').getByTestId('key-chip')).toHaveText(['Ctrl+E×']);
+});

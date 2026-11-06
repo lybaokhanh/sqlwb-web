@@ -247,3 +247,16 @@ test('bind-variables', async ({ page }) => {
   await dlg.locator('input[name="var-regionId"]').focus();
   await shot(page, 'bind-variables');
 });
+
+test('keyboard-shortcuts', async ({ page }) => {
+  await start(page);
+  await menu(page, 'Help', 'Keyboard shortcuts');
+  const dlg = page.getByTestId('key-editor');
+  await dlg.getByTestId('key-filter').fill('exec');
+  const row = dlg.getByTestId('key-row-execCurrent');
+  await row.getByTestId('key-add').click();
+  await page.keyboard.press('F9');
+  await expect(row.getByTestId('key-reset')).toBeVisible();
+  await dlg.getByTestId('key-row-execAll').getByTestId('key-add').click();
+  await shot(page, 'keyboard-shortcuts');
+});
