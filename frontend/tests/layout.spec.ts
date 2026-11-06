@@ -1,0 +1,481 @@
+import { expect, test, type Page } from '@playwright/test';
+
+// All tests use the in-memory mock server (no backend needed).
+const APP = '/?mock=1';
+
+/** App login screen (mock: every login works). */
+async function appLogin(page: Page) {
+  const form = page.getByRole('form', { name: 'Log in' });
+  await expect(form).toBeVisible();
+  await form.locator('input[name="appUser"]').fill('tester');
+  await form.locator('input[name="appPassword"]').fill('secret');
+  await form.getByRole('button', { name: 'Log in' }).click();
+  await expect(form).toBeHidden();
+}
+
+/** Database login dialog for the active tab. */
+async function dbLogin(page: Page) {
+  const dlg = page.getByRole('dialog');
+  await expect(dlg).toBeVisible();
+  const user = dlg.locator('input[name="username"]');
+  if (await user.count()) await user.fill('scott');
+  await dlg.locator('input[name="password"]').fill('tiger');
+  await dlg.getByRole('button', { name: 'Connect', exact: true }).click();
+  await expect(dlg).toBeHidden();
+  await expect(page.locator('.tb-conn .conn-state.connected')).toBeVisible();
+}
+
+async function start(page: Page) {
+  await page.goto(APP);
+  await appLogin(page);
+  await dbLogin(page);
+}
+
+async function typeSql(page: Page, sql: string) {
+  await expect(page.locator('.monaco-editor')).toBeVisible();
+  await page.locator('.monaco-editor .view-lines').click();
+  await page.keyboard.type(sql);
+}
+
+test('login screen says that a new name creates the account', async ({ page }) => {
+  await page.goto(APP);
+  await expect(page.getByText('First login with a new name creates the account.')).toBeVisible();
+  await appLogin(page);
+  await expect(page.locator('.app-user')).toHaveText('tester');
+});
+
+test('menu bar has the 9 menus', async ({ page }) => {
+  await start(page);
+  await expect(page.locator('.menu-title')).toHaveText([
+    'File', 'Edit', 'View', 'Data', 'SQL', 'Macros', 'Workspace', 'Tools', 'Help',
+  ]);
+});
+
+test('SQL menu shows Execute Current with Ctrl+Enter', async ({ page }) => {
+  await start(page);
+  await page.locator('.menu-title', { hasText: 'SQL' }).click();
+  const item = page.locator('.menu-item', { hasText: 'Execute Current' });
+  await expect(item).toBeVisible();
+  await expect(item.locator('.menu-key')).toHaveText('Ctrl+Enter');
+  await page.keyboard.press('Escape');
+  await expect(item).toBeHidden();
+});
+
+test('Add tab makes Statement 2', async ({ page }) => {
+  await start(page);
+  await page.getByRole('button', { name: 'Add tab' }).click();
+  await expect(page.getByRole('tab', { name: /Statement 2/ })).toBeVisible();
+  await expect(page.getByRole('tab', { name: /Statement 2/ })).toHaveAttribute('aria-selected', 'true');
+});
+
+test('theme toggle switches data-theme and survives reload', async ({ page }) => {
+  await start(page);
+  const html = page.locator('html');
+  const before = await html.getAttribute('data-theme');
+  expect(before === 'dark' || before === 'light').toBeTruthy();
+  const after = before === 'dark' ? 'light' : 'dark';
+  await page.locator('[data-action="toggleTheme"]').click();
+  await expect(html).toHaveAttribute('data-theme', after);
+  await page.reload();
+  await expect(html).toHaveAttribute('data-theme', after);
+  await expect(page.locator('.menu-title').first()).toBeVisible();
+  await expect(html).toHaveAttribute('data-theme', after);
+});
+
+test('select 100000: first page only, more on scroll, Fetch all, virtual grid', async ({ page }) => {
+  await start(page);
+  await typeSql(page, 'select 100000');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByRole('tab', { name: /Result 1/ })).toBeVisible();
+  const info = page.getByTestId('row-info');
+  await expect(info).toHaveText('500 rows loaded, more on scroll');
+  await page.waitForTimeout(500);
+  await expect(info).toHaveText('500 rows loaded, more on scroll'); // no fetch without scroll
+  await page.getByTestId('grid').evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  await expect(info).toHaveText('5500 rows loaded, more on scroll');
+  await page.getByTestId('fetch-all').click();
+  await expect(info).toHaveText('100000 rows', { timeout: 30_000 });
+  await expect(page.getByTestId('fetch-all')).toHaveCount(0);
+  const domRows = await page.locator('.grid-row').count();
+  expect(domRows).toBeGreaterThan(0);
+  expect(domRows).toBeLessThan(200);
+  await page.getByTestId('grid').evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  await expect(page.locator('.grid-row .cell.rownum', { hasText: /^100000$/ })).toBeVisible();
+  expect(await page.locator('.grid-row').count()).toBeLessThan(200);
+});
+
+test('status bar shows the cursor position', async ({ page }) => {
+  await start(page);
+  await expect(page.getByTestId('statusbar')).toContainText(/L:1 C:\d+/);
+});
+
+test('Statistics tab after Execute All', async ({ page }) => {
+  await start(page);
+  await typeSql(page, 'select 1;\nselect 2;\nselect 1;\nupdate t set a = 1;');
+  await page.keyboard.press('Control+Shift+E');
+  const statsTab = page.getByRole('tab', { name: 'Statistics' });
+  await expect(statsTab).toBeVisible();
+  await statsTab.click();
+  const stats = page.getByTestId('stats');
+  await expect(stats).toContainText('4 statements, 3 distinct');
+  await expect(stats.getByRole('button', { name: 'Export CSV' })).toBeVisible();
+  const download = page.waitForEvent('download');
+  await stats.getByRole('button', { name: 'Export CSV' }).click();
+  expect((await download).suggestedFilename()).toMatch(/\.csv$/);
+});
+
+test('Max. results caps the result tabs', async ({ page }) => {
+  await start(page);
+  await page.locator('#max-results').fill('2');
+  await typeSql(page, 'select 1;\nselect 2;\nselect 3;');
+  await page.keyboard.press('Control+Shift+E');
+  await expect(page.getByRole('tab', { name: 'Statistics' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: /^Result \d/ })).toHaveCount(2);
+  await expect(page.getByRole('tab', { name: /^Result 3/ })).toBeVisible();
+});
+
+test('workspace comes back after reload and asks only for the password', async ({ page }) => {
+  await start(page);
+  await page.getByRole('button', { name: 'Add tab' }).click();
+  await expect(page.getByRole('tab', { name: /Statement 2/ })).toBeVisible();
+  await page.waitForTimeout(1500); // debounce 1 s
+  await page.reload();
+  await expect(page.getByRole('tab', { name: /Statement 2/ })).toBeVisible();
+  const dlg = page.getByRole('dialog');
+  await expect(dlg).toContainText('Reconnect');
+  await expect(dlg.locator('input[name="username"]')).toHaveCount(0);
+  await expect(dlg.locator('input[name="password"]')).toBeVisible();
+});
+
+test('admin sees the update button and can start the update', async ({ page }) => {
+  await start(page);
+  const btn = page.getByTestId('update-btn');
+  await expect(btn).toHaveText('Update to Build 133');
+  await btn.click();
+  const dlg = page.getByRole('dialog');
+  await expect(dlg).toContainText('All users get disconnected');
+  const reloaded = page.waitForEvent('load');
+  await dlg.getByRole('button', { name: 'Update and restart' }).click();
+  await expect(page.getByTestId('restarting')).toBeVisible();
+  await reloaded;
+});
+
+async function menu(page: Page, title: string, item: string) {
+  await page.locator('.menu-title', { hasText: new RegExp(`^${title}$`) }).click();
+  await page.locator('.menu-item', { hasText: item }).first().click();
+}
+
+test('DB Explorer: objects, columns, source, data, put SELECT in editor', async ({ page }) => {
+  await start(page);
+  await page.locator('[data-action="dbExplorer"]').click();
+  await expect(page.getByRole('tab', { name: /DB Explorer/ })).toBeVisible();
+  const ex = page.getByTestId('explorer');
+  const emp = ex.getByRole('option', { name: /^EMP\s*TABLE/ });
+  await expect(emp).toBeVisible();
+  await emp.click();
+  await expect(ex.locator('.meta-table')).toContainText('NAME_1');
+  await ex.getByRole('tab', { name: 'Indexes' }).click();
+  await expect(ex.locator('.meta-table')).toContainText('PK_EMP');
+  await ex.getByRole('tab', { name: 'Source' }).click();
+  await expect(ex.getByTestId('source')).toContainText('CREATE');
+  await ex.getByRole('tab', { name: 'Data', exact: true }).click();
+  await expect(ex.locator('.grid-row').first()).toBeVisible();
+  await emp.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Put SELECT in editor' }).click();
+  await expect(page.getByRole('tab', { name: /Statement 1/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.monaco-editor .view-lines')).toContainText('SCOTT.EMP');
+});
+
+test('DB Explorer: Objects type filter, Procedures, Triggers, Search table data', async ({ page }) => {
+  await start(page);
+  await page.locator('[data-action="dbExplorer"]').click();
+  const ex = page.getByTestId('explorer');
+  const list = ex.getByRole('listbox', { name: 'Objects' });
+  await expect(list.getByRole('option', { name: /^EMP_SEQ\s*SEQUENCE/ })).toBeVisible();
+  await expect(list.getByRole('option', { name: /RAISE_SALARY/ })).toHaveCount(0);
+  await ex.getByLabel('Object types').selectOption('VIEW');
+  await expect(list.getByRole('option')).toHaveCount(1);
+
+  await ex.getByRole('tab', { name: 'Procedures' }).click();
+  await expect(list.getByRole('option')).toHaveCount(3);
+  await list.getByRole('option', { name: /^GET_SALARY/ }).click();
+  await expect(ex.getByTestId('source')).toContainText('FUNCTION');
+  await ex.getByRole('tab', { name: 'Parameters' }).click();
+  await expect(ex.locator('.meta-table')).toContainText('P_EMP_ID');
+
+  await ex.getByRole('tab', { name: 'Triggers' }).click();
+  await list.getByRole('option', { name: /^EMP_BIU\s*EMP/ }).click();
+  await expect(ex.locator('.rinfo')).toContainText('on EMP, BEFORE EACH ROW INSERT OR UPDATE');
+
+  await ex.getByRole('tab', { name: 'Search table data' }).click();
+  await expect(list.getByRole('option')).toHaveCount(5);
+  await ex.getByLabel('Search value').fill('smith');
+  await ex.getByRole('button', { name: 'Search 5 tables' }).click();
+  await expect(ex.getByTestId('search-progress')).toContainText('Done: 5 tables searched. 2 tables with hits.');
+  await expect(ex.getByTestId('search-hits')).toContainText('SCOTT.EMP: 3 rows');
+  await expect(ex.getByTestId('search-hits')).toContainText('SMITH 1');
+  await expect(list.getByRole('option', { name: /^EMP\s*3 rows/ })).toBeVisible();
+});
+
+test('editable grid: change, delete, confirm and save', async ({ page }) => {
+  await start(page);
+  await typeSql(page, 'select * from emp');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByTestId('row-info')).toHaveText('50 rows');
+  const row1 = page.locator('.grid-row').nth(0);
+  await row1.locator('.cell').nth(2).dblclick();
+  await page.locator('.cell-input').fill('Changed');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.cell.changed')).toHaveText('Changed');
+  await page.locator('.grid-row').nth(1).locator('.cell').nth(3).click();
+  await page.locator('[data-action="deleteRow"]').click();
+  await expect(page.locator('.grid-row.deleted')).toHaveCount(1);
+  await page.locator('[data-action="insertRow"]').click();
+  await expect(page.locator('.grid-row.inserted')).toHaveCount(1);
+  await page.locator('[data-action="saveChanges"]').click();
+  const sql = page.getByTestId('confirm-sql');
+  await expect(sql).toContainText("UPDATE emp SET NAME_1 = 'Changed' WHERE ID = 1;");
+  await expect(sql).toContainText('DELETE FROM emp WHERE ID = 2;');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+  await expect(page.locator('.cell.changed')).toHaveCount(0);
+  await expect(page.locator('.grid-row.deleted')).toHaveCount(0);
+  await expect(page.getByTestId('row-info')).toHaveText('50 rows');
+});
+
+test('editable grid: table without PK asks for key columns', async ({ page }) => {
+  await start(page);
+  await typeSql(page, 'select * from bonus');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByTestId('row-info')).toHaveText('50 rows');
+  await page.locator('.grid-row').nth(0).locator('.cell').nth(2).dblclick();
+  await page.locator('.cell-input').fill('X');
+  await page.keyboard.press('Enter');
+  await page.locator('[data-action="saveChanges"]').click();
+  const dlg = page.getByRole('dialog', { name: 'Define Key Columns' });
+  await expect(dlg).toBeVisible();
+  await dlg.getByLabel(/^ID/).check();
+  await dlg.getByRole('button', { name: 'OK' }).click();
+  await expect(page.getByTestId('confirm-sql')).toContainText("UPDATE bonus SET NAME_1 = 'X' WHERE ID = 1;");
+});
+
+test('load run with warning for the default database', async ({ page }) => {
+  await start(page);
+  await typeSql(page, 'select 1');
+  await menu(page, 'Tools', 'Load run');
+  const panel = page.getByTestId('load-panel');
+  await expect(panel.getByRole('alert')).toContainText('WARNING');
+  await panel.locator('input[name="seconds"]').fill('2');
+  await panel.getByRole('button', { name: 'Start' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Start load run' }).click();
+  await expect(page.getByTestId('load-stats')).toContainText('finished', { timeout: 10_000 });
+  await expect(panel.locator('svg.load-chart')).toBeVisible();
+});
+
+test('export: save as TSV and copy as SQL INSERT', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await start(page);
+  await typeSql(page, 'select * from dept where rownum <= 3');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByTestId('row-info')).toHaveText('3 rows');
+  await menu(page, 'Data', 'Save data as');
+  const dlg = page.getByRole('dialog');
+  await dlg.getByLabel('Text (tab)').check();
+  const download = page.waitForEvent('download');
+  await dlg.getByRole('button', { name: 'Save' }).click();
+  expect((await download).suggestedFilename()).toBe('dept.tsv');
+  await menu(page, 'Data', 'Copy as SQL INSERT');
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('INSERT INTO dept (ID, NAME_1');
+});
+
+test('macros: create with Ctrl+M, run from the Macros menu', async ({ page }) => {
+  await start(page);
+  await page.locator('.monaco-editor .view-lines').click();
+  await page.keyboard.press('Control+m');
+  const dlg = page.getByRole('dialog', { name: 'Manage macros' });
+  await expect(dlg).toBeVisible();
+  await dlg.locator('input[name="macroName"]').fill('fortytwo');
+  await dlg.locator('textarea[name="macroSql"]').fill('select 42');
+  await dlg.getByRole('button', { name: 'Save' }).click();
+  await expect(dlg.getByRole('option', { name: /fortytwo/ })).toBeVisible();
+  await dlg.getByRole('button', { name: 'Close' }).click();
+  await menu(page, 'Macros', 'fortytwo');
+  await expect(page.getByTestId('row-info')).toHaveText('42 rows');
+});
+
+test('bookmarks list @WbTag lines', async ({ page }) => {
+  await start(page);
+  await typeSql(page, '-- @WbTag first\nselect 1;');
+  await menu(page, 'Tools', 'Bookmarks');
+  const dlg = page.getByRole('dialog', { name: 'Bookmarks' });
+  await expect(dlg.getByRole('option', { name: /first/ })).toBeVisible();
+  await dlg.getByRole('option', { name: /first/ }).click();
+  await expect(dlg).toBeHidden();
+});
+test('screenshots dark and light', async ({ page }) => {
+  await start(page);
+  await typeSql(page, 'select * from customers where id < 200');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByTestId('row-info')).toHaveText('200 rows');
+  for (const theme of ['dark', 'light'] as const) {
+    if ((await page.locator('html').getAttribute('data-theme')) !== theme) {
+      await page.locator('[data-action="toggleTheme"]').click();
+    }
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `tests/screenshots/${theme}.png` });
+  }
+});
+
+/** Opens a new tab from the Connect window with the given profile flags. */
+async function connectWith(page: Page, flags: ('readOnly' | 'confirmUpdates' | 'sysdba' | 'confirmNoWhere')[]) {
+  await page.keyboard.press('Alt+C');
+  const dlg = page.getByRole('dialog');
+  await dlg.locator('input[name="username"]').fill('scott');
+  await dlg.locator('input[name="password"]').fill('tiger');
+  for (const f of flags) await dlg.locator(`input[name="${f}"]`).check();
+  await dlg.getByRole('button', { name: 'Connect', exact: true }).click();
+  await expect(dlg).toBeHidden();
+  await expect(page.locator('.tb-conn .conn-state.connected')).toBeVisible();
+}
+
+test('read-only profile blocks DML and DDL, SELECT still runs', async ({ page }) => {
+  await start(page);
+  await connectWith(page, ['readOnly']);
+  await typeSql(page, 'update t set a = 1');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByTestId('messages')).toContainText('is read-only: UPDATE is not allowed');
+  await expect(page.getByTestId('messages')).not.toContainText('rows affected');
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('select * from emp');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByTestId('row-info')).toHaveText('50 rows');
+});
+
+test('confirm updates: Cancel stops the run, Execute runs it', async ({ page }) => {
+  await start(page);
+  await connectWith(page, ['confirmUpdates']);
+  await typeSql(page, 'update t set a = 1');
+  await page.keyboard.press('Control+Enter');
+  const dlg = page.getByRole('dialog');
+  await expect(dlg).toContainText('1 DML statement');
+  await dlg.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dlg).toBeHidden();
+  await expect(page.getByTestId('messages')).not.toContainText('rows affected');
+  await page.keyboard.press('Control+Enter');
+  await dlg.getByRole('button', { name: 'Execute' }).click();
+  await expect(page.getByTestId('messages')).toContainText('rows affected');
+});
+
+test('confirm DML without WHERE asks, UPDATE with WHERE runs at once', async ({ page }) => {
+  await start(page);
+  await connectWith(page, ['confirmNoWhere']);
+  await typeSql(page, 'delete from t');
+  await page.keyboard.press('Control+Enter');
+  const dlg = page.getByRole('dialog');
+  await expect(dlg).toContainText('changes all rows');
+  await dlg.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByTestId('messages')).not.toContainText('rows affected');
+  await page.locator('.monaco-editor .view-lines').click();
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('update t set a = 1 where id = 2');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByTestId('messages')).toContainText('rows affected');
+});
+
+test('connection manager: group, test, save, filter; reload connects without a password prompt', async ({ page }) => {
+  await start(page);
+  await page.keyboard.press('Alt+C');
+  const dlg = page.getByRole('dialog', { name: 'Select Connection Profile' });
+  await dlg.locator('input[name="profileName"]').fill('BSD_02');
+  await dlg.locator('input[name="group"]').fill('team-dba');
+  await dlg.locator('input[name="username"]').fill('bsd_02');
+  await dlg.locator('input[name="password"]').fill('wrong');
+  await dlg.getByRole('button', { name: 'Test' }).click();
+  await expect(dlg.getByTestId('cm-test-result')).toContainText('Failed: ORA-01017');
+  await dlg.locator('input[name="password"]').fill('tiger');
+  await dlg.getByRole('button', { name: 'Test' }).click();
+  await expect(dlg.getByTestId('cm-test-result')).toContainText('OK: Oracle');
+  await expect(dlg.locator('input[name="savePassword"]')).toBeChecked();
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click();
+  const list = dlg.getByTestId('cm-list');
+  await expect(list).toContainText('team-dba');
+  await expect(list.getByRole('option', { name: /BSD_02/ })).toBeVisible();
+  await dlg.getByRole('button', { name: 'New', exact: true }).click();
+  await dlg.locator('input[name="profileName"]').fill('FA_11');
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click();
+  await dlg.getByLabel('Filter profiles').fill('bsd');
+  await expect(list.getByRole('option')).toHaveCount(1);
+  await list.getByRole('option', { name: /BSD_02/ }).click();
+  await dlg.getByRole('button', { name: 'Connect', exact: true }).click();
+  await expect(dlg).toBeHidden();
+  await expect(page.locator('.tb-conn .conn-state.connected')).toBeVisible();
+  await page.waitForTimeout(1500); // debounced workspace save
+  await page.reload();
+  await expect(page.locator('.tb-conn .conn-state.connected')).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('connection manager: import WbProfiles.xml from the desktop app', async ({ page }) => {
+  await start(page);
+  await page.keyboard.press('Alt+C');
+  const dlg = page.getByRole('dialog', { name: 'Select Connection Profile' });
+  await dlg.getByTestId('cm-import').setInputFiles({
+    name: 'WbProfiles.xml', mimeType: 'text/xml',
+    buffer: Buffer.from('<java><object><void property="name"><string><name>KC_ALO_14</name></string></void></object><name>KC_BSD_01</name></java>'),
+  });
+  await expect(dlg.getByTestId('cm-test-result')).toContainText('Imported 2 profiles');
+  await expect(dlg.getByTestId('cm-list').getByRole('option')).toHaveCount(2);
+  await expect(dlg.getByTestId('cm-list')).toContainText('imported');
+});
+
+test('failed server save: the browser copy restores the work after reload', async ({ page }) => {
+  await start(page);
+  await page.evaluate(() => localStorage.setItem('sqlwb.mock.failSave', '1'));
+  await typeSql(page, 'select 42 from dual');
+  await page.waitForTimeout(1500);
+  // Saves keep failing through the reload (also the pagehide save).
+  await page.reload();
+  await appLoginIfNeeded(page);
+  await expect(page.locator('.monaco-editor .view-lines')).toContainText('select 42 from dual');
+  await expect(page.getByTestId('messages')).toContainText('restored from it');
+});
+
+test('two browser tabs: the older one gets a conflict dialog, not a silent overwrite', async ({ page, context }) => {
+  await start(page);
+  const other = await context.newPage();
+  await start(other);
+  await typeSql(other, 'select 1 from dual');
+  await other.waitForTimeout(1500);
+  await typeSql(page, 'select 2 from dual');
+  const dlg = page.getByRole('dialog', { name: 'Workspace changed in another browser tab' });
+  await expect(dlg).toBeVisible({ timeout: 5000 });
+  await dlg.getByRole('button', { name: 'Keep this tab' }).click();
+  await expect(dlg).toBeHidden();
+});
+
+/** After a reload the mock session survives (sessionStorage); log in only when the form shows. */
+async function appLoginIfNeeded(page: Page) {
+  const form = page.getByRole('form', { name: 'Log in' });
+  await page.waitForTimeout(300);
+  if (await form.isVisible()) await appLogin(page);
+  const dlg = page.getByRole('dialog');
+  if (await dlg.isVisible()) await dlg.getByRole('button', { name: 'Cancel' }).click();
+}
+
+test('Connect switches the current statement tab; Connect in new tab adds one', async ({ page }) => {
+  await start(page);
+  await typeSql(page, 'select 7 from dual');
+  await page.keyboard.press('Alt+C');
+  const dlg = page.getByRole('dialog', { name: 'Select Connection Profile' });
+  await dlg.locator('input[name="profileName"]').fill('FA_11');
+  await dlg.locator('input[name="username"]').fill('fa_11');
+  await dlg.locator('input[name="password"]').fill('tiger');
+  await dlg.getByRole('button', { name: 'Connect', exact: true }).click();
+  await expect(dlg).toBeHidden();
+  await expect(page.getByTestId('messages')).toContainText('as fa_11');
+  await expect(page.getByRole('tab', { name: /Statement 2/ })).toHaveCount(0);
+  await expect(page.locator('.monaco-editor .view-lines')).toContainText('select 7 from dual');
+  await page.keyboard.press('Alt+C');
+  await dlg.getByRole('button', { name: 'Connect in new tab' }).click();
+  await expect(page.getByRole('tab', { name: /Statement 2/ })).toHaveAttribute('aria-selected', 'true');
+});
