@@ -6,6 +6,8 @@ Rules: [CONTRIBUTING.md](CONTRIBUTING.md#feature-docs-and-releases).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-06
+
 ### Added
 
 - **Keyboard shortcuts per OS, change keys**: hotkeys work in a normal browser tab on Windows, macOS (⌘) and Linux. Menus show only keys that the browser lets through. Help → Keyboard shortcuts changes the keys. The workspace saves them per OS. [Docs](docs/features/keyboard-shortcuts.md)
@@ -113,7 +115,9 @@ First release.
 
   ![Engine update](docs/images/engine-update.png)
 
-[Unreleased]: https://github.com/lybaokhanh/sqlwb-web/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/lybaokhanh/sqlwb-web/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/lybaokhanh/sqlwb-web/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/lybaokhanh/sqlwb-web/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/lybaokhanh/sqlwb-web/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/lybaokhanh/sqlwb-web/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/lybaokhanh/sqlwb-web/releases/tag/v0.1.0
