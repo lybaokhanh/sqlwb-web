@@ -15,9 +15,16 @@ Since: v0.1.0
 
 ## Shortcuts
 
-| Action | Keys |
-|---|---|
-| Vertical tabs on / off | Ctrl+Shift+, or Alt+Shift+T |
-| Add tab | Alt+T |
-| Close tab | Ctrl+K |
-| Next / previous tab | Alt+PageDown / Alt+PageUp |
+| Action | Windows / Linux | macOS |
+|---|---|---|
+| Vertical tabs on / off | Ctrl+Shift+, or Alt+Shift+T | ⇧⌘, or ⌥⇧T |
+| Add tab | Alt+T | ⌥T |
+| Close tab | Ctrl+K | ⌘K |
+| Next / previous tab | Alt+PageDown / Alt+PageUp | ⌃⌥→ / ⌃⌥← |
+
+The browser keeps Ctrl+T, Ctrl+W and Ctrl+Tab (⌘T, ⌘W, ⌃Tab on macOS). The app uses the Alt keys.
+
+## Change keys
+
+Open Help → Keyboard shortcuts. Click **+ Add** in the row of the action and press the new key.
+The workspace saves the keys, per OS. Details: [Keyboard shortcuts](keyboard-shortcuts.md).

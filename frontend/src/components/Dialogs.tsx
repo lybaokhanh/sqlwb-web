@@ -1,4 +1,4 @@
-// Modal dialogs: login, new connection, prompt, about, shortcut list,
+// Modal dialogs: login, new connection, prompt, about, key editor,
 // and the command palette.
 import { useMemo, useState } from 'react';
 import {
@@ -6,6 +6,7 @@ import {
 } from '../state/store';
 import { rememberedUser, rememberUser } from '../state/persist';
 import { ACTIONS, shortcutText } from '../shortcuts';
+import { KeyEditor } from './KeyEditor';
 import { isEnabled, runAction } from '../actions';
 import { startUpdate } from '../boot';
 import { BookmarksDialog, ConfirmDialog, ExportDialog, FilesDialog, KeysDialog, MacrosDialog, Modal, VarsDialog } from './FeatureDialogs';
@@ -79,22 +80,10 @@ function PromptDialog({ d }: { d: Extract<Dialog, { kind: 'prompt' }> }) {
   );
 }
 
-function ShortcutsDialog() {
-  return (
-    <Modal title="Keyboard shortcuts" onClose={close} wide>
-      <div className="shortcut-list">
-        {ACTIONS.filter((a) => a.keys).map((a) => (
-          <div key={a.id} className="shortcut-row"><span>{a.label}</span><kbd>{shortcutText(a.id)}</kbd></div>
-        ))}
-      </div>
-      <div className="form-buttons"><button className="btn primary" autoFocus onClick={close}>Close</button></div>
-    </Modal>
-  );
-}
-
 function CommandPalette() {
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);
+  useStore((s) => s.keys); // re-render when the user changes keys
   const items = useMemo(() => {
     const f = q.toLowerCase();
     return ACTIONS.filter((a) => isEnabled(a.id) && a.label.toLowerCase().includes(f));
@@ -137,7 +126,7 @@ export function Dialogs() {
       {d?.kind === 'login' && <LoginDialog key={d.tabId} tabId={d.tabId} />}
       {d?.kind === "connect" && <ConnectionManager select={d.select} />}
       {d?.kind === 'prompt' && <PromptDialog d={d} />}
-      {d?.kind === 'shortcuts' && <ShortcutsDialog />}
+      {d?.kind === 'shortcuts' && <KeyEditor />}
       {d?.kind === 'about' && (
         <Modal title="About" onClose={close}>
           <pre className="about">{d.text}</pre>

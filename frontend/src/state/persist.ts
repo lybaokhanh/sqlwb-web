@@ -1,7 +1,7 @@
 // Workspace save/restore on the server (GET/PUT /api/workspace).
 // Debounced 1 s, and at once (keepalive) when the page hides.
 // localStorage is only an offline fallback. Passwords are never saved.
-import type { ConfigResponse, SavedProfile, WorkspaceConnection, WorkspaceDoc } from "../api/protocol";
+import type { ConfigResponse, KeyMap, SavedProfile, WorkspaceConnection, WorkspaceDoc } from "../api/protocol";
 import { client, HttpError } from "../api/client";
 import { savedId, toProfile } from "./profiles";
 import { getTheme, setTheme } from '../theme';
@@ -31,6 +31,7 @@ export function toDoc(): WorkspaceDoc {
     timeout: s.timeout,
     maxResults: s.maxResults,
     macros: s.macros,
+    keys: s.keys,
   };
 }
 
@@ -107,6 +108,21 @@ export async function loadWorkspace(): Promise<{ doc: WorkspaceDoc; fromBrowser:
 
 let subscribed = false;
 
+/** Keeps only well-formed key lists from the saved workspace. */
+function cleanKeys(raw: unknown): KeyMap {
+  const out: KeyMap = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [plat, acts] of Object.entries(raw as Record<string, unknown>)) {
+    if (!acts || typeof acts !== 'object') continue;
+    const m: Record<string, string[]> = {};
+    for (const [id, list] of Object.entries(acts as Record<string, unknown>)) {
+      if (Array.isArray(list)) m[id] = list.filter((k): k is string => typeof k === 'string');
+    }
+    out[plat] = m;
+  }
+  return out;
+}
+
 /** Builds the start state from the saved workspace and /api/config. */
 export function initWorkspace(cfg: ConfigResponse, doc: WorkspaceDoc, saved: SavedProfile[] = []) {
   const def: Profile = {
@@ -154,7 +170,7 @@ export function initWorkspace(cfg: ConfigResponse, doc: WorkspaceDoc, saved: Sav
   useStore.setState({
     tabs, activeTabId, profiles,
     maxRows: doc.maxRows ?? 0, timeout: doc.timeout ?? 0, maxResults: doc.maxResults ?? 20,
-    macros: Array.isArray(doc.macros) ? doc.macros : [], defaultUrl: cfg.defaultProfile.url,
+    macros: Array.isArray(doc.macros) ? doc.macros : [], keys: cleanKeys(doc.keys), defaultUrl: cfg.defaultProfile.url,
     ready: true,
   });
 
@@ -169,7 +185,7 @@ export function initWorkspace(cfg: ConfigResponse, doc: WorkspaceDoc, saved: Sav
     if (!s.ready) return;
     if (s.tabs === prev.tabs && s.profiles === prev.profiles && s.activeTabId === prev.activeTabId
       && s.maxRows === prev.maxRows && s.timeout === prev.timeout && s.maxResults === prev.maxResults
-      && s.macros === prev.macros) return;
+      && s.macros === prev.macros && s.keys === prev.keys) return;
     later();
   });
   document.addEventListener('sqlwb-theme', later);

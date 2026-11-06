@@ -369,8 +369,26 @@ body.resizing-x { cursor: col-resize; user-select: none; }
 .btn.primary:hover { filter: brightness(1.08); }
 .btn:disabled { opacity: 0.5; }
 .about { font: 12px/1.6 var(--font-mono); margin: 0; white-space: pre-wrap; }
-.shortcut-list { max-height: 60vh; overflow: auto; columns: 2; column-gap: 24px; }
-.shortcut-row { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; break-inside: avoid; }
+/* Key editor (Help > Keyboard shortcuts) */
+.key-editor { display: flex; flex-direction: column; gap: 8px; }
+.key-list { max-height: 55vh; overflow: auto; border: 1px solid var(--border); border-radius: 4px; }
+.key-row {
+  display: grid; grid-template-columns: minmax(140px, 1fr) auto; align-items: center; gap: 2px 12px;
+  padding: 3px 8px; border-bottom: 1px solid var(--border);
+}
+.key-row:last-child { border-bottom: 0; }
+.key-chips { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px; }
+.key-chip {
+  display: inline-flex; align-items: center; gap: 2px; padding: 0 2px 0 6px; border: 1px solid var(--border-strong);
+  border-radius: 3px; background: var(--bg-chrome);
+}
+.key-chip kbd { color: var(--fg); }
+.key-x { border: 0; background: none; color: var(--fg-muted); padding: 0 3px; line-height: 1; }
+.key-x:hover { color: var(--err); }
+.key-recording { font-size: 12px; color: var(--accent); }
+.key-msg { grid-column: 1 / -1; font-size: 12px; color: var(--fg-muted); }
+.key-msg.err { color: var(--err); }
+.key-note { font-size: 12px; color: var(--fg-muted); }
 
 .palette {
   width: 520px; max-width: calc(100vw - 32px); border-radius: 8px; overflow: hidden;

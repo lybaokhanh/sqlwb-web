@@ -6,6 +6,12 @@ Rules: [CONTRIBUTING.md](CONTRIBUTING.md#feature-docs-and-releases).
 
 ## [Unreleased]
 
+### Added
+
+- **Keyboard shortcuts per OS, change keys**: hotkeys work in a normal browser tab on Windows, macOS (⌘) and Linux. Menus show only keys that the browser lets through. Help → Keyboard shortcuts changes the keys. The workspace saves them per OS. [Docs](docs/features/keyboard-shortcuts.md)
+
+  ![Keyboard shortcuts](docs/images/keyboard-shortcuts.png)
+
 ## [0.2.1] - 2026-11-06
 
 ### Fixed

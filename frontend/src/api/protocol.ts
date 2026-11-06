@@ -90,11 +90,14 @@ export interface WorkspaceDoc {
   tabs?: WorkspaceTab[]; activeTab?: string; theme?: 'dark' | 'light';
   maxRows?: number; timeout?: number; maxResults?: number;
   macros?: Macro[];
+  /** User keys: platform (mac, win, linux) -> action id -> keys. A list replaces the defaults. */
+  keys?: KeyMap;
   /** Browser copy only: set while a server save failed, so the next start uses this copy. */
   unsentAt?: number;
   /** Browser copy only: server version the copy is based on. */
   baseVer?: number;
 }
+export type KeyMap = Record<string, Record<string, string[]>>;
 export interface Macro { name: string; sql: string; shortcut?: string }
 export interface VersionResponse { app: string; wbBuild: string; wbBuildDate: string }
 export interface ConfigResponse { defaultProfile: { name: string; url: string } }
