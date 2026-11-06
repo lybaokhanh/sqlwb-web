@@ -348,6 +348,31 @@ body.resizing-x { cursor: col-resize; user-select: none; }
 }
 .modal.wide { width: 560px; }
 .modal-title { font-weight: 600; margin-bottom: 12px; }
+.modal { position: relative; }
+.modal:focus { outline: none; }
+/* Default size: the body wrapper has no box, so the layout is as without it. */
+.modal-body { display: contents; }
+/* Size set by the user (inline width and height): the body fills the dialog and scrolls. */
+.modal.sized { display: flex; flex-direction: column; min-width: 280px; min-height: 140px; max-height: calc(100vh - 48px); }
+.modal.sized > .modal-body { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; margin: 0 -4px; padding: 0 4px 4px; }
+.modal.sized > .modal-body > form, .modal.sized > .modal-body > .cm, .modal.sized > .modal-body > .cell-dlg,
+.modal.sized > .modal-body > .key-editor { flex: 1 1 auto; }
+.modal.sized .key-editor { min-height: 0; }
+.modal.sized .form-buttons:last-child { margin-top: auto; padding-top: 6px; }
+.modal.sized .cm { height: auto; min-height: 0; }
+.modal.sized .cell-dlg-host { height: auto; min-height: 120px; }
+.modal.sized .macros { flex: 1 1 auto; }
+.modal.sized .macro-form label { flex: none; }
+.modal.sized .macro-form label:has(textarea) { flex: 1 1 auto; }
+.modal.sized .macro-form textarea { flex: 1; resize: none; }
+.modal.sized .bm-list, .modal.sized .files-list, .modal.sized .keys-list, .modal.sized .key-list,
+.modal.sized .confirm-sql, .modal.sized .about { flex: 1 1 auto; max-height: none; min-height: 60px; overflow: auto; }
+.modal-grip {
+  position: absolute; right: 1px; bottom: 1px; width: 14px; height: 14px; cursor: nwse-resize; touch-action: none;
+  border-bottom-right-radius: 7px; opacity: 0.6;
+  background: linear-gradient(135deg, transparent 0 50%, var(--fg-faint) 50% 58%, transparent 58% 70%, var(--fg-faint) 70% 78%, transparent 78%);
+}
+.modal-grip:hover { opacity: 1; }
 .form { display: flex; flex-direction: column; gap: 10px; }
 .form label { display: flex; flex-direction: column; gap: 3px; color: var(--fg-muted); font-size: 12px; flex: 1; }
 .form label.check { flex-direction: row; align-items: center; gap: 6px; color: var(--fg); font-size: 13px; }
@@ -369,8 +394,28 @@ body.resizing-x { cursor: col-resize; user-select: none; }
 .btn.primary:hover { filter: brightness(1.08); }
 .btn:disabled { opacity: 0.5; }
 .about { font: 12px/1.6 var(--font-mono); margin: 0; white-space: pre-wrap; }
-.shortcut-list { max-height: 60vh; overflow: auto; columns: 2; column-gap: 24px; }
-.shortcut-row { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; break-inside: avoid; }
+/* Key editor (Help > Keyboard shortcuts) */
+.key-editor { display: flex; flex-direction: column; gap: 8px; }
+.key-list { max-height: 55vh; overflow: auto; border: 1px solid var(--border); border-radius: 4px; }
+.key-row {
+  display: grid; grid-template-columns: minmax(140px, 1fr) auto; align-items: center; gap: 2px 12px;
+  padding: 3px 8px; border-bottom: 1px solid var(--border);
+}
+.key-row:last-child { border-bottom: 0; }
+.key-chips { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px; }
+.key-chip {
+  display: inline-flex; align-items: center; gap: 2px; padding: 0 2px 0 6px; border: 1px solid var(--border-strong);
+  border-radius: 3px; background: var(--bg-chrome);
+}
+.key-chip kbd { color: var(--fg); }
+.key-x { border: 0; background: none; color: var(--fg-muted); padding: 0 3px; line-height: 1; }
+.key-x:hover { color: var(--err); }
+.key-chip.builtin { padding-right: 6px; }
+.key-tag { color: var(--fg-muted); font-size: 0.85em; margin-left: 4px; }
+.key-recording { font-size: 12px; color: var(--accent); }
+.key-msg { grid-column: 1 / -1; font-size: 12px; color: var(--fg-muted); }
+.key-msg.err { color: var(--err); }
+.key-note { font-size: 12px; color: var(--fg-muted); }
 
 .palette {
   width: 520px; max-width: calc(100vw - 32px); border-radius: 8px; overflow: hidden;

@@ -14,6 +14,7 @@ export function TabBar() {
   const tabs = useStore((s) => s.tabs);
   const activeId = useStore((s) => s.activeTabId);
   const profiles = useStore((s) => s.profiles);
+  useStore((s) => s.keys); // re-render when the user changes keys
   const [editing, setEditing] = useState<string | null>(null);
   const [drag, setDrag] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());

@@ -8,13 +8,128 @@ import { buildText, download, fileBase, loadAllRows, type ExportFormat } from '.
 
 const close = () => useStore.setState({ dialog: null });
 
-export function Modal({ title, onClose, children, wide, xl }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean; xl?: boolean }) {
+// ---- Escape ----
+// Open dialogs (and the command palette), last opened at the end.
+// One window listener closes only the top entry, also when the focus is outside the dialog.
+// An entry with `above` (the command palette) is drawn above all dialogs, so it closes first.
+const escStack: { close: () => void; above: boolean }[] = [];
+
+function onEscape(e: KeyboardEvent) {
+  // An inner widget (Monaco, a key recorder) that uses Escape calls preventDefault.
+  if (e.key !== 'Escape' || e.defaultPrevented) return;
+  // Escape that cancels IME input (e.g. Vietnamese Telex) does not close the dialog.
+  if (e.isComposing || e.keyCode === 229) return;
+  const top = [...escStack].reverse().find((x) => x.above) ?? escStack[escStack.length - 1];
+  if (!top) return;
+  e.preventDefault();
+  top.close();
+}
+
+/**
+ * Escape anywhere on the page calls onClose while this component is the top dialog.
+ * above: the component is drawn above all dialogs (the command palette).
+ */
+export function useEscapeClose(onClose: () => void, above = false) {
+  const ref = useRef(onClose);
+  ref.current = onClose;
+  useEffect(() => {
+    const entry = { close: () => ref.current(), above };
+    escStack.push(entry);
+    if (escStack.length === 1) window.addEventListener('keydown', onEscape);
+    return () => {
+      const i = escStack.indexOf(entry);
+      if (i >= 0) escStack.splice(i, 1);
+      if (!escStack.length) window.removeEventListener('keydown', onEscape);
+    };
+  }, [above]);
+}
+
+// ---- Dialog size ----
+// The user can resize each dialog with the corner grip. The size is kept per dialog kind
+// in localStorage (per browser, because it depends on the screen). Double-click the grip: default size.
+type Size = { w: number; h: number };
+const SIZE_PREFIX = 'sqlwb.dialogSize.';
+const MIN_W = 280;
+const MIN_H = 140;
+const MARGIN = 24; // matches max-height: calc(100vh - 48px) in styles.css
+
+function clampSize(s: Size): Size {
+  const maxW = Math.max(MIN_W, window.innerWidth - 2 * MARGIN);
+  const maxH = Math.max(MIN_H, window.innerHeight - 2 * MARGIN);
+  return {
+    w: Math.round(Math.min(maxW, Math.max(MIN_W, s.w))),
+    h: Math.round(Math.min(maxH, Math.max(MIN_H, s.h))),
+  };
+}
+
+function loadSize(key: string): Size | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(SIZE_PREFIX + key) ?? 'null') as Partial<Size> | null;
+    if (v && Number.isFinite(v.w) && Number.isFinite(v.h)) return clampSize(v as Size);
+  } catch { /* storage blocked or bad value */ }
+  return null;
+}
+
+function saveSize(key: string, s: Size | null) {
+  try {
+    if (s) localStorage.setItem(SIZE_PREFIX + key, JSON.stringify(s));
+    else localStorage.removeItem(SIZE_PREFIX + key);
+  } catch { /* storage blocked */ }
+}
+
+/**
+ * Dialog frame. Escape closes it from anywhere on the page. The user can resize it.
+ * sizeKey: stable name for the saved size. Set it when the title changes (e.g. contains a name).
+ */
+export function Modal({ title, onClose, children, wide, xl, sizeKey }: {
+  title: string; onClose: () => void; children: React.ReactNode; wide?: boolean; xl?: boolean; sizeKey?: string;
+}) {
+  const key = sizeKey ?? title;
+  const box = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<Size | null>(() => loadSize(key));
+  useEscapeClose(onClose);
+
+  // Move the focus into the dialog when no element inside took it (autoFocus).
+  useEffect(() => {
+    const el = box.current;
+    if (el && !el.contains(document.activeElement)) el.focus({ preventScroll: true });
+  }, []);
+
+  const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = box.current;
+    if (e.button !== 0 || !el) return;
+    e.preventDefault();
+    const r = el.getBoundingClientRect();
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    const grip = e.currentTarget;
+    grip.setPointerCapture(e.pointerId);
+    let last: Size | null = null;
+    // The dialog stays centered, so each edge moves by half the size change: use 2x the mouse move.
+    const move = (ev: PointerEvent) => {
+      last = clampSize({ w: r.width + 2 * (ev.clientX - x0), h: r.height + 2 * (ev.clientY - y0) });
+      setSize(last);
+    };
+    const end = () => {
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', end);
+      grip.removeEventListener('pointercancel', end);
+      if (last) saveSize(key, last);
+    };
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', end);
+    grip.addEventListener('pointercancel', end);
+  };
+  const resetSize = () => { setSize(null); saveSize(key, null); };
+
   return (
     <div className="modal-back" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`modal${wide ? ' wide' : ''}${xl ? ' xl' : ''}`} role="dialog" aria-label={title}
-        onKeyDown={(e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.stopPropagation(); onClose(); } }}>
+      <div ref={box} tabIndex={-1} className={`modal${wide ? ' wide' : ''}${xl ? ' xl' : ''}${size ? ' sized' : ''}`}
+        role="dialog" aria-label={title} style={size ? { width: size.w, height: size.h } : undefined}>
         <div className="modal-title">{title}</div>
-        {children}
+        <div className="modal-body">{children}</div>
+        <div className="modal-grip" data-testid="modal-grip" title="Drag to resize. Double-click: default size."
+          onPointerDown={startResize} onDoubleClick={resetSize} />
       </div>
     </div>
   );
@@ -23,7 +138,7 @@ export function Modal({ title, onClose, children, wide, xl }: { title: string; o
 export function ConfirmDialog({ d }: { d: Extract<Dialog, { kind: 'confirm' }> }) {
   const cancel = () => { close(); d.onCancel?.(); };
   return (
-    <Modal title={d.title} onClose={cancel} wide={!!d.pre}>
+    <Modal title={d.title} onClose={cancel} wide={!!d.pre} sizeKey={d.pre ? 'confirm-sql' : 'confirm'}>
       {d.danger && <div className="load-warning">{d.text}</div>}
       {!d.danger && <p className="dialog-text">{d.text}</p>}
       {d.pre && <pre className="confirm-sql" data-testid="confirm-sql">{d.pre}</pre>}

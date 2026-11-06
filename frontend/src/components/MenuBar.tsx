@@ -1,7 +1,7 @@
 // Desktop-style menu bar. Click opens, hover switches, Esc closes.
 import { useEffect, useRef, useState } from 'react';
 import { MENUS } from '../menus';
-import { ACTION_BY_ID, shortcutText } from '../shortcuts';
+import { ACTION_BY_ID, formatKey, macroKey, shortcutText } from '../shortcuts';
 import { isEnabled, runAction } from '../actions';
 import { useStore } from '../state/store';
 import { runMacro } from '../state/features';
@@ -10,6 +10,7 @@ export function MenuBar() {
   const [open, setOpen] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const macros = useStore((s) => s.macros);
+  useStore((s) => s.keys); // re-render when the user changes keys
 
   useEffect(() => {
     if (open === null) return;
@@ -65,7 +66,7 @@ export function MenuBar() {
               {m.dynamic === 'macros' && macros.map((mac, k) => (
                 <button key={`mac${k}`} role="menuitem" className="menu-item" onClick={() => { setOpen(null); runMacro(mac); }}>
                   <span className="menu-label">{mac.name}</span>
-                  <span className="menu-key">{mac.shortcut ?? ''}</span>
+                  <span className="menu-key">{mac.shortcut ? (macroKey(mac.shortcut) ? formatKey(macroKey(mac.shortcut)) : mac.shortcut) : ''}</span>
                 </button>
               ))}
             </div>
