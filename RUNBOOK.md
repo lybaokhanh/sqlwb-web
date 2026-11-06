@@ -49,6 +49,7 @@ Smoke tests need H2. Start a test container with H2 allowed (never on a shared s
 docker run -d --rm --name sqlwb-test -p 18484:8484 -e JDBC_URL_ALLOW='jdbc:(h2|oracle|postgresql):.*' sqlwb-web:local
 node scripts/smoke-ws.mjs http://localhost:18484   # expect "PASS smoke-ws", exit 0
 node scripts/smoke-wb.mjs http://localhost:18484   # expect "PASS smoke-wb", exit 0
+node scripts/smoke-vars.mjs http://localhost:18484 # expect "PASS smoke-vars", exit 0
 docker stop sqlwb-test
 cd frontend && npx playwright test                 # mock mode, expect exit 0
 ```

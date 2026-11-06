@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FileInfo, Macro } from '../api/protocol';
 import { client } from '../api/client';
-import { useStore, type Dialog } from '../state/store';
+import { answerVars, useStore, type Dialog } from '../state/store';
 import { findBookmarks, jumpTo, runMacro, saveMacros } from '../state/features';
 import { buildText, download, fileBase, loadAllRows, type ExportFormat } from '../state/exporter';
 
@@ -31,6 +31,32 @@ export function ConfirmDialog({ d }: { d: Extract<Dialog, { kind: 'confirm' }> }
         <button className="btn" onClick={cancel}>Cancel</button>
         <button className={`btn ${d.danger ? 'danger' : 'primary'}`} autoFocus onClick={() => { close(); d.onOk(); }}>{d.okLabel ?? 'OK'}</button>
       </div>
+    </Modal>
+  );
+}
+
+/** Values for :name / $[?name] variables. Enter = OK, Escape = Cancel (the run stops). */
+export function VarsDialog({ d }: { d: Extract<Dialog, { kind: 'vars' }> }) {
+  const [values, setValues] = useState(d.values);
+  const cancel = () => answerVars(d.tabId, d.reqId, null);
+  const sql = d.sql.length > 600 ? `${d.sql.slice(0, 600)}...` : d.sql;
+  return (
+    <Modal title="Variable values" onClose={cancel} wide>
+      <form className="form" data-testid="vars-dialog" onSubmit={(e) => { e.preventDefault(); answerVars(d.tabId, d.reqId, values); }}>
+        {sql && <pre className="confirm-sql">{sql}</pre>}
+        {d.names.map((n, i) => (
+          <label key={n}>
+            :{n}
+            <input name={`var-${n}`} className="mono" autoFocus={i === 0} value={values[n] ?? ''}
+              onChange={(e) => setValues({ ...values, [n]: e.target.value })} onFocus={(e) => e.currentTarget.select()} />
+          </label>
+        ))}
+        <div className="form-note">Values are sent as text. Define fixed values with WbVarDef name=value.</div>
+        <div className="form-buttons">
+          <button type="button" className="btn" onClick={cancel}>Cancel</button>
+          <button type="submit" className="btn primary">Execute</button>
+        </div>
+      </form>
     </Modal>
   );
 }

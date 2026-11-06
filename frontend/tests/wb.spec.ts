@@ -188,6 +188,40 @@ test.describe('mock', () => {
     await expect(group.getByRole('tab', { name: /DB Explorer/ })).toHaveAttribute('aria-selected', 'true');
   });
 
+  test('missing :name variables: the run asks for the values, prefills them next time, Cancel stops', async ({ page }) => {
+    await start(page);
+    await typeSql(page, "select 12 from orders where region_id = :regionId and status_id = :statusId and fmt = 'HH24:MI'");
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Control+Enter');
+    const dlg = page.getByTestId('vars-dialog');
+    await expect(dlg).toBeVisible();
+    // Both binds, in order. 'HH24:MI' is in a string: no variable.
+    await expect(dlg.locator('input')).toHaveCount(2);
+    await expect(dlg.locator('input[name="var-regionId"]')).toBeFocused();
+    await dlg.locator('input[name="var-regionId"]').fill('1');
+    await dlg.locator('input[name="var-statusId"]').fill('7');
+    await page.keyboard.press('Enter');
+    await expect(dlg).toBeHidden();
+    await expect(page.getByTestId('row-info')).toHaveText('12 rows');
+    await page.getByRole('tab', { name: 'Messages' }).click();
+    await expect(page.getByTestId('messages')).toContainText("regionId = '1', statusId = '7'");
+    // Next run: the last values are prefilled. Escape cancels and nothing runs.
+    await page.locator('.monaco-editor .view-lines').click();
+    await page.keyboard.press('Control+Enter');
+    await expect(dlg.locator('input[name="var-regionId"]')).toHaveValue('1');
+    await page.keyboard.press('Escape');
+    await expect(dlg).toBeHidden();
+    await expect(page.getByTestId('messages')).toContainText('Cancelled: no value for regionId, statusId');
+    // WbVarDef gives a value: no question.
+    await page.locator('.monaco-editor .view-lines').click();
+    await page.keyboard.press('Control+Home');
+    await page.keyboard.type('WbVarDef regionId=1;\nWbVarDef statusId=7;\n');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Control+Shift+E');
+    await expect(page.getByTestId('row-info')).toHaveText('12 rows');
+    await expect(dlg).toHaveCount(0);
+  });
+
   test('tab groups move to a sidebar and back, like Edge vertical tabs', async ({ page }) => {
     await start(page);
     const bar = page.getByTestId('tabbar');

@@ -154,6 +154,8 @@ export interface ExecuteMsg {
 }
 export interface FetchMsg { type: 'fetch'; tabId: string; resultId: string; offset: number; count: number }
 export interface CancelMsg { type: 'cancel'; tabId: string }
+/** Answer to varPrompt. values null = the user cancelled (the run stops). */
+export interface VarValuesMsg { type: 'varValues'; tabId: string; reqId: string; values: Record<string, string> | null }
 export interface CommitMsg { type: 'commit'; tabId: string }
 export interface RollbackMsg { type: 'rollback'; tabId: string }
 export interface DisconnectMsg { type: 'disconnect'; tabId: string }
@@ -206,7 +208,7 @@ export interface LoadStopMsg { type: 'loadStop'; tabId: string }
 
 export type ClientMsg =
   | ConnectMsg | ExecuteMsg | FetchMsg | CancelMsg | CommitMsg
-  | RollbackMsg | DisconnectMsg | FormatMsg | PingMsg | HelloMsg | CompleteMsg
+  | RollbackMsg | DisconnectMsg | FormatMsg | PingMsg | HelloMsg | CompleteMsg | VarValuesMsg
   | MetaMsg | SaveChangesMsg | LoadStartMsg | LoadStopMsg;
 
 // ---- Server -> client ----
@@ -254,11 +256,18 @@ export interface CompletionItem { label: string; insert: string; kind: Completio
 export interface CompletionMsg { type: 'completion'; tabId: string; reqId: string; title?: string; items: CompletionItem[]; error?: string }
 /** A DML ran since the last commit or rollback (open = true), or the transaction ended. */
 export interface TxStateMsg { type: 'txState'; tabId: string; open: boolean }
+/**
+ * Statement `index` uses variables without a value (:name, $[&name]) or $[?name].
+ * The run waits for varValues. values = prefill (defined or last value).
+ */
+export interface VarPromptMsg {
+  type: 'varPrompt'; tabId: string; reqId: string; index: number; names: string[]; values: Record<string, string>;
+}
 
 export type ServerMsg =
   | ConnectedMsg | DisconnectedMsg | ErrorMsg | StmtStartMsg | ResultMetaMsg
   | RowsMsg | UpdateCountMsg | MessageMsg | StmtEndMsg | ExecEndMsg | FormattedMsg | PongMsg | ResultClosedMsg
-  | MetaResultMsg | SavedMsg | LoadStatsMsg | LoadEndMsg | CompletionMsg | TxStateMsg;
+  | MetaResultMsg | SavedMsg | LoadStatsMsg | LoadEndMsg | CompletionMsg | TxStateMsg | VarPromptMsg;
 
 /** Each WS frame is a JSON array of messages (batched by the server every 25 ms). */
 export type ServerFrame = ServerMsg[] | ServerMsg;

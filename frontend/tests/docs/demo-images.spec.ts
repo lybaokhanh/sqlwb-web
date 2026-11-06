@@ -235,3 +235,15 @@ test('cell-dialog', async ({ page }) => {
   await expect(dlg.locator('.view-line', { hasText: '"owner": {' })).toBeVisible();
   await shot(page, 'cell-dialog');
 });
+
+test('bind-variables', async ({ page }) => {
+  await start(page);
+  await typeSql(page, 'select * from orders\nwhere region_id = :regionId\nand status_id = :statusId');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Control+Enter');
+  const dlg = page.getByTestId('vars-dialog');
+  await dlg.locator('input[name="var-regionId"]').fill('10');
+  await dlg.locator('input[name="var-statusId"]').fill('3');
+  await dlg.locator('input[name="var-regionId"]').focus();
+  await shot(page, 'bind-variables');
+});
