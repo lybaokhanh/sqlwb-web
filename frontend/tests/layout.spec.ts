@@ -553,3 +553,69 @@ test('auto completion: keywords while typing in the typed case, tables after FRO
   await page.keyboard.press('Escape');
   await expect(page.locator('.monaco-editor .view-lines')).toContainText('select * from');
 });
+
+test('Escape closes Manage macros opened from the editor; then Ctrl+Enter works again', async ({ page }) => {
+  await start(page);
+  await typeSql(page, 'select 42');
+  await page.keyboard.press('Control+m');
+  const dlg = page.getByRole('dialog', { name: 'Manage macros' });
+  await expect(dlg).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dlg).toBeHidden();
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByTestId('row-info')).toHaveText('42 rows');
+});
+
+test('Escape closes the connection manager, also when the focus is outside the dialog', async ({ page }) => {
+  await start(page);
+  await page.keyboard.press('Alt+C');
+  const dlg = page.getByRole('dialog', { name: 'Select Connection Profile' });
+  await expect(dlg).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dlg).toBeHidden();
+  // Focus on the page body: Escape still closes the dialog.
+  await page.keyboard.press('Alt+C');
+  await expect(dlg).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press('Escape');
+  await expect(dlg).toBeHidden();
+});
+
+test('dialog size: drag the grip, size stays after reopen and reload, double-click resets', async ({ page }) => {
+  await start(page);
+  const dlg = page.getByRole('dialog', { name: 'Select Connection Profile' });
+  const size = async () => {
+    const b = (await dlg.boundingBox())!;
+    return { w: Math.round(b.width), h: Math.round(b.height) };
+  };
+  await page.keyboard.press('Alt+C');
+  await expect(dlg).toBeVisible();
+  const def = await size();
+  const listH = (await dlg.locator('.cm-list').boundingBox())!.height;
+  // Drag the corner grip 100 px left and 80 px up. The dialog stays centered, so the size changes by 2x.
+  const g = (await dlg.getByTestId('modal-grip').boundingBox())!;
+  await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(g.x + g.width / 2 - 100, g.y + g.height / 2 - 80, { steps: 5 });
+  await page.mouse.up();
+  const small = await size();
+  expect(Math.abs(small.w - (def.w - 200))).toBeLessThanOrEqual(2);
+  expect(Math.abs(small.h - (def.h - 160))).toBeLessThanOrEqual(2);
+  // The inner layout follows the dialog size.
+  expect((await dlg.locator('.cm-list').boundingBox())!.height).toBeLessThan(listH - 100);
+  await page.keyboard.press('Escape');
+  await expect(dlg).toBeHidden();
+  await page.keyboard.press('Alt+C');
+  await expect(dlg).toBeVisible();
+  expect(await size()).toEqual(small);
+  await page.keyboard.press('Escape');
+  await page.reload();
+  await dbLogin(page);
+  await page.keyboard.press('Alt+C');
+  await expect(dlg).toBeVisible();
+  expect(await size()).toEqual(small);
+  // Double-click the grip: default size, and the saved size is gone.
+  await dlg.getByTestId('modal-grip').dblclick();
+  expect(await size()).toEqual(def);
+  expect(await page.evaluate(() => localStorage.getItem('sqlwb.dialogSize.connections'))).toBeNull();
+});

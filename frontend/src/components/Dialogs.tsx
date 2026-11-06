@@ -8,7 +8,7 @@ import { rememberedUser, rememberUser } from '../state/persist';
 import { ACTIONS, shortcutText } from '../shortcuts';
 import { isEnabled, runAction } from '../actions';
 import { startUpdate } from '../boot';
-import { BookmarksDialog, ConfirmDialog, ExportDialog, FilesDialog, KeysDialog, MacrosDialog, Modal, VarsDialog } from './FeatureDialogs';
+import { BookmarksDialog, ConfirmDialog, ExportDialog, FilesDialog, KeysDialog, MacrosDialog, Modal, useEscapeClose, VarsDialog } from './FeatureDialogs';
 import { ConnectionManager } from "./ConnectionManager";
 import { CellDialog } from './CellDialog';
 import { upsertProfile } from "../state/profiles";
@@ -36,7 +36,7 @@ function LoginDialog({ tabId }: { tabId: string }) {
     }
   };
   return (
-    <Modal title={`${editUser ? 'Connect' : 'Reconnect'}: ${profile.name}`} onClose={() => cancelLogin(tabId)}>
+    <Modal title={`${editUser ? 'Connect' : 'Reconnect'}: ${profile.name}`} onClose={() => cancelLogin(tabId)} sizeKey="login">
       <form onSubmit={submit} className="form">
         <div className="form-note" title={profile.url}>{profile.url}</div>
         {editUser ? (
@@ -67,7 +67,7 @@ function LoginDialog({ tabId }: { tabId: string }) {
 function PromptDialog({ d }: { d: Extract<Dialog, { kind: 'prompt' }> }) {
   const [v, setV] = useState(d.value);
   return (
-    <Modal title={d.title} onClose={close}>
+    <Modal title={d.title} onClose={close} sizeKey="prompt">
       <form className="form" onSubmit={(e) => { e.preventDefault(); close(); d.onOk(v); }}>
         <input autoFocus value={v} onChange={(e) => setV(e.target.value)} onFocus={(e) => e.currentTarget.select()} />
         <div className="form-buttons">
@@ -100,6 +100,8 @@ function CommandPalette() {
     return ACTIONS.filter((a) => isEnabled(a.id) && a.label.toLowerCase().includes(f));
   }, [q]);
   const shut = () => useStore.setState({ palette: false });
+  // Escape closes the palette also when the focus is not in the input.
+  useEscapeClose(shut);
   const run = (i: number) => {
     const a = items[i];
     shut();
@@ -111,7 +113,6 @@ function CommandPalette() {
         <input autoFocus placeholder="Type a command" value={q}
           onChange={(e) => { setQ(e.target.value); setSel(0); }}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') { e.stopPropagation(); shut(); }
             if (e.key === 'ArrowDown') { e.preventDefault(); setSel((s) => Math.min(items.length - 1, s + 1)); }
             if (e.key === 'ArrowUp') { e.preventDefault(); setSel((s) => Math.max(0, s - 1)); }
             if (e.key === 'Enter') { e.preventDefault(); run(sel); }
@@ -145,7 +146,7 @@ export function Dialogs() {
         </Modal>
       )}
       {d?.kind === 'update' && (
-        <Modal title={`Update to Build ${d.build}`} onClose={close}>
+        <Modal title={`Update to Build ${d.build}`} onClose={close} sizeKey="update">
           <p className="dialog-text">All users get disconnected and the app restarts. Open transactions are lost.</p>
           <div className="form-buttons">
             <button className="btn" onClick={close}>Cancel</button>

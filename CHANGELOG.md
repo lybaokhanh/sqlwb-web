@@ -6,6 +6,14 @@ Rules: [CONTRIBUTING.md](CONTRIBUTING.md#feature-docs-and-releases).
 
 ## [Unreleased]
 
+### Added
+
+- **Resizable dialogs**: drag the corner grip. The browser keeps the size per dialog kind. Double-click the grip for the default size. [Docs](docs/features/workspace.md#dialog-size)
+
+### Fixed
+
+- Escape closes a dialog also when the focus is not in it (e.g. Ctrl+M or Alt+C from the editor). Before, the dialog stayed open and all shortcuts were off.
+
 ## [0.2.1] - 2026-11-06
 
 ### Fixed

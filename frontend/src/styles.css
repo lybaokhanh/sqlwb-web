@@ -348,6 +348,29 @@ body.resizing-x { cursor: col-resize; user-select: none; }
 }
 .modal.wide { width: 560px; }
 .modal-title { font-weight: 600; margin-bottom: 12px; }
+.modal { position: relative; }
+.modal:focus { outline: none; }
+/* Default size: the body wrapper has no box, so the layout is as without it. */
+.modal-body { display: contents; }
+/* Size set by the user (inline width and height): the body fills the dialog and scrolls. */
+.modal.sized { display: flex; flex-direction: column; min-width: 280px; min-height: 140px; max-height: calc(100vh - 48px); }
+.modal.sized > .modal-body { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; margin: 0 -4px; padding: 0 4px 4px; }
+.modal.sized > .modal-body > form, .modal.sized > .modal-body > .cm, .modal.sized > .modal-body > .cell-dlg { flex: 1 1 auto; }
+.modal.sized .form-buttons:last-child { margin-top: auto; padding-top: 6px; }
+.modal.sized .cm { height: auto; min-height: 0; }
+.modal.sized .cell-dlg-host { height: auto; min-height: 120px; }
+.modal.sized .macros { flex: 1 1 auto; }
+.modal.sized .macro-form label { flex: none; }
+.modal.sized .macro-form label:has(textarea) { flex: 1 1 auto; }
+.modal.sized .macro-form textarea { flex: 1; resize: none; }
+.modal.sized .bm-list, .modal.sized .files-list, .modal.sized .keys-list, .modal.sized .shortcut-list,
+.modal.sized .confirm-sql, .modal.sized .about { flex: 1 1 auto; max-height: none; min-height: 60px; overflow: auto; }
+.modal-grip {
+  position: absolute; right: 1px; bottom: 1px; width: 14px; height: 14px; cursor: nwse-resize; touch-action: none;
+  border-bottom-right-radius: 7px; opacity: 0.6;
+  background: linear-gradient(135deg, transparent 0 50%, var(--fg-faint) 50% 58%, transparent 58% 70%, var(--fg-faint) 70% 78%, transparent 78%);
+}
+.modal-grip:hover { opacity: 1; }
 .form { display: flex; flex-direction: column; gap: 10px; }
 .form label { display: flex; flex-direction: column; gap: 3px; color: var(--fg-muted); font-size: 12px; flex: 1; }
 .form label.check { flex-direction: row; align-items: center; gap: 6px; color: var(--fg); font-size: 13px; }
