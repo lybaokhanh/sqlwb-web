@@ -31,7 +31,10 @@ export interface ActionDef {
   keys?: string[];
   /** macOS defaults, when they are not the same as `keys`. */
   mac?: string[];
-  /** Monaco handles the default keys itself (the global handler leaves them alone). */
+  /**
+   * Monaco handles the default keys of this action itself. The global handler leaves them alone,
+   * and the user cannot remove them (built-in keys). Keys that the user adds run from the app.
+   */
   native?: boolean;
 }
 
@@ -150,12 +153,29 @@ const KEY_ALIASES: Record<string, string> = {
   del: 'Delete', backspace: 'Backspace', comma: ',', period: '.', slash: '/', minus: '-', equal: '=',
 };
 
+// Other KeyboardEvent.code names that a key text can contain.
+const OTHER_CODES = [
+  'Numpad0', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'Numpad5', 'Numpad6', 'Numpad7', 'Numpad8', 'Numpad9',
+  'NumpadAdd', 'NumpadSubtract', 'NumpadMultiply', 'NumpadDivide', 'NumpadDecimal', 'NumpadEqual', 'NumpadComma',
+  'IntlBackslash', 'IntlRo', 'IntlYen', 'ContextMenu', 'PrintScreen', 'ScrollLock', 'Pause', 'NumLock',
+];
+
+/** Lower-case name -> key name, for aliases and code names. The lookup is not case-sensitive. */
+const NAME_BY_LOWER: Record<string, string> = Object.fromEntries([
+  ...Object.entries(CODE_NAMES).map(([c, n]) => [c.toLowerCase(), n]),
+  ...OTHER_CODES.map((c) => [c.toLowerCase(), c]),
+  ...Object.entries(KEY_ALIASES),
+]);
+
 function keyName(k: string): string {
   if (k.length === 1) return k.toUpperCase();
   const l = k.toLowerCase();
-  if (KEY_ALIASES[l]) return KEY_ALIASES[l];
+  if (NAME_BY_LOWER[l]) return NAME_BY_LOWER[l];
   if (/^f\d{1,2}$/.test(l)) return l.toUpperCase();
-  return codeName(k);
+  if (/^key[a-z]$/.test(l)) return l.slice(3).toUpperCase();
+  if (/^digit\d$/.test(l)) return l.slice(5);
+  // Unknown name: upper-case the first letter, as the old macro matcher did.
+  return codeName(k[0].toUpperCase() + k.slice(1));
 }
 
 function build(mods: Set<string>, key: string): string {
@@ -248,6 +268,35 @@ export function reservedKey(k: string, p: Platform = platform()): string | undef
   return RESERVED[p][k];
 }
 
+// ---- Keys that the user cannot record ----
+const CLIPBOARD_KEYS = ['Mod+C', 'Mod+V', 'Mod+X', 'Mod+A'];
+
+/**
+ * Why the user cannot record this key, or undefined when the key is usable.
+ * Reserved keys and the keys of other actions are checked elsewhere.
+ */
+export function keyProblem(k: string, p: Platform = platform()): string | undefined {
+  const parts = k.endsWith('++') ? [...k.slice(0, -2).split('+'), '+'] : k.split('+');
+  const key = parts[parts.length - 1];
+  const mods = new Set(parts.slice(0, -1));
+  // One character: a letter, a digit or a punctuation key.
+  const printable = key.length === 1;
+  if (CLIPBOARD_KEYS.includes(k)) return 'Copy, paste, cut and select all need this key.';
+  // Windows / Linux: AltGr sends Ctrl+Alt. It types @ { } ą and more on many keyboards.
+  if (p !== 'mac' && printable && mods.has('Mod') && mods.has('Alt')) {
+    return 'AltGr types characters with this key on many keyboards.';
+  }
+  // macOS: Option (with or without Shift) types characters, e.g. ⌥E, ⌥⇧K.
+  if (p === 'mac' && printable && mods.has('Alt') && !mods.has('Mod') && !mods.has('Ctrl')) {
+    return 'Option types characters with this key.';
+  }
+  // Plain keys (also with Shift only) are for typing. Function keys are allowed.
+  if (![...mods].some((m) => m !== 'Shift') && !/^F\d{1,2}$/.test(key)) {
+    return p === 'mac' ? 'Add ⌘, ⌃ or ⌥, or use a function key.' : 'Add Ctrl or Alt, or use a function key.';
+  }
+  return undefined;
+}
+
 // ---- Effective keys (defaults + user overrides) ----
 export type KeyOverrides = Partial<Record<ActionId, string[]>>;
 
@@ -272,10 +321,27 @@ export function isOverridden(id: ActionId, p: Platform = platform()): boolean {
   return Array.isArray(overrides(p)[id]);
 }
 
-/** Keys that run this action now: the user override, else the defaults. */
+/**
+ * Built-in keys: the default keys of a native action on this platform. Monaco keeps them.
+ * The user cannot remove them or give them to another action.
+ */
+export function builtinKeys(id: ActionId, p: Platform = platform()): string[] {
+  return ACTION_BY_ID[id].native ? defaultKeys(id, p) : [];
+}
+
+/** The native action that has this key as a built-in key, or undefined. */
+export function builtinOwner(k: string, p: Platform = platform()): ActionId | undefined {
+  return ACTIONS.find((a) => a.native && defaultKeys(a.id, p).includes(k))?.id;
+}
+
+/** Keys that run this action now: the built-in keys, then the user override (else the defaults). */
 export function keysFor(id: ActionId, p: Platform = platform()): string[] {
   const o = overrides(p)[id];
-  return Array.isArray(o) ? o : defaultKeys(id, p);
+  if (!Array.isArray(o)) return defaultKeys(id, p);
+  const builtin = builtinKeys(id, p);
+  // A built-in key of another action stays with that action (old saved workspaces).
+  const extra = o.filter((k) => !builtin.includes(k) && !builtinOwner(k, p));
+  return [...builtin, ...extra];
 }
 
 /** Text for menus and tooltips, e.g. "Ctrl+T / Alt+T". */
@@ -326,11 +392,13 @@ function lookup(): Map<string, Bound> {
   mapFor = s;
   map = new Map();
   for (const a of ACTIONS) {
-    // A native action stays with Monaco, unless the user changed its keys.
-    const native = !!a.native && !isOverridden(a.id);
+    // Native per key: a built-in key stays with Monaco and the inputs.
+    // A key that the user added runs from the app.
+    const builtin = builtinKeys(a.id);
     for (const k of keysFor(a.id)) {
+      const native = builtin.includes(k);
       const old = map.get(k);
-      if (!old || (old.native && !native)) map.set(k, { id: a.id, native });
+      if (!old || (native && !old.native)) map.set(k, { id: a.id, native });
     }
   }
   return map;

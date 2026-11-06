@@ -355,7 +355,9 @@ body.resizing-x { cursor: col-resize; user-select: none; }
 /* Size set by the user (inline width and height): the body fills the dialog and scrolls. */
 .modal.sized { display: flex; flex-direction: column; min-width: 280px; min-height: 140px; max-height: calc(100vh - 48px); }
 .modal.sized > .modal-body { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; margin: 0 -4px; padding: 0 4px 4px; }
-.modal.sized > .modal-body > form, .modal.sized > .modal-body > .cm, .modal.sized > .modal-body > .cell-dlg { flex: 1 1 auto; }
+.modal.sized > .modal-body > form, .modal.sized > .modal-body > .cm, .modal.sized > .modal-body > .cell-dlg,
+.modal.sized > .modal-body > .key-editor { flex: 1 1 auto; }
+.modal.sized .key-editor { min-height: 0; }
 .modal.sized .form-buttons:last-child { margin-top: auto; padding-top: 6px; }
 .modal.sized .cm { height: auto; min-height: 0; }
 .modal.sized .cell-dlg-host { height: auto; min-height: 120px; }
@@ -363,7 +365,7 @@ body.resizing-x { cursor: col-resize; user-select: none; }
 .modal.sized .macro-form label { flex: none; }
 .modal.sized .macro-form label:has(textarea) { flex: 1 1 auto; }
 .modal.sized .macro-form textarea { flex: 1; resize: none; }
-.modal.sized .bm-list, .modal.sized .files-list, .modal.sized .keys-list, .modal.sized .shortcut-list,
+.modal.sized .bm-list, .modal.sized .files-list, .modal.sized .keys-list, .modal.sized .key-list,
 .modal.sized .confirm-sql, .modal.sized .about { flex: 1 1 auto; max-height: none; min-height: 60px; overflow: auto; }
 .modal-grip {
   position: absolute; right: 1px; bottom: 1px; width: 14px; height: 14px; cursor: nwse-resize; touch-action: none;
@@ -408,6 +410,8 @@ body.resizing-x { cursor: col-resize; user-select: none; }
 .key-chip kbd { color: var(--fg); }
 .key-x { border: 0; background: none; color: var(--fg-muted); padding: 0 3px; line-height: 1; }
 .key-x:hover { color: var(--err); }
+.key-chip.builtin { padding-right: 6px; }
+.key-tag { color: var(--fg-muted); font-size: 0.85em; margin-left: 4px; }
 .key-recording { font-size: 12px; color: var(--accent); }
 .key-msg { grid-column: 1 / -1; font-size: 12px; color: var(--fg-muted); }
 .key-msg.err { color: var(--err); }

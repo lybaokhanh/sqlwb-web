@@ -5,6 +5,7 @@ import type { ConfigResponse, KeyMap, SavedProfile, WorkspaceConnection, Workspa
 import { client, HttpError } from "../api/client";
 import { savedId, toProfile } from "./profiles";
 import { getTheme, setTheme } from '../theme';
+import { ACTION_BY_ID, normalizeKey, type Platform } from '../shortcuts';
 import {
   DEFAULT_COLOR, DEFAULT_PROFILE_ID, makeTab, newId, useStore, type Profile, type Tab,
 } from './store';
@@ -108,17 +109,29 @@ export async function loadWorkspace(): Promise<{ doc: WorkspaceDoc; fromBrowser:
 
 let subscribed = false;
 
-/** Keeps only well-formed key lists from the saved workspace. */
+const PLATFORMS: Platform[] = ['mac', 'win', 'linux'];
+
+/**
+ * Keeps only well-formed key lists from the saved workspace.
+ * Each key gets the canonical form of its OS ("Ctrl+E" on Windows becomes "Mod+E").
+ * Invalid keys, duplicate keys, unknown actions and unknown OS names are dropped.
+ */
 function cleanKeys(raw: unknown): KeyMap {
   const out: KeyMap = {};
   if (!raw || typeof raw !== 'object') return out;
   for (const [plat, acts] of Object.entries(raw as Record<string, unknown>)) {
-    if (!acts || typeof acts !== 'object') continue;
+    if (!PLATFORMS.includes(plat as Platform) || !acts || typeof acts !== 'object') continue;
     const m: Record<string, string[]> = {};
     for (const [id, list] of Object.entries(acts as Record<string, unknown>)) {
-      if (Array.isArray(list)) m[id] = list.filter((k): k is string => typeof k === 'string');
+      if (!Array.isArray(list) || !Object.prototype.hasOwnProperty.call(ACTION_BY_ID, id)) continue;
+      const keys: string[] = [];
+      for (const k of list) {
+        const n = typeof k === 'string' ? normalizeKey(k, false, plat as Platform) : '';
+        if (n && !keys.includes(n)) keys.push(n);
+      }
+      m[id] = keys;
     }
-    out[plat] = m;
+    if (Object.keys(m).length) out[plat] = m;
   }
   return out;
 }

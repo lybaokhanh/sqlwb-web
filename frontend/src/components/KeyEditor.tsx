@@ -1,10 +1,11 @@
 // Key editor (Help > Keyboard shortcuts). Lists all actions. The user adds,
 // removes and resets keys. Keys are saved per OS in the workspace.
+// Built-in keys (the default keys of editor actions like Undo) stay: Monaco keeps them.
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../state/store';
 import {
-  ACTIONS, ACTION_BY_ID, PLATFORM_NAME, actionForKey, defaultKeys, eventToKey, formatKey, isOverridden, keysFor,
-  macroKey, platform, reservedKey, resetAllKeys, setActionKeys, type ActionId,
+  ACTIONS, ACTION_BY_ID, PLATFORM_NAME, actionForKey, builtinKeys, builtinOwner, defaultKeys, eventToKey, formatKey,
+  isOverridden, keyProblem, keysFor, macroKey, platform, reservedKey, resetAllKeys, setActionKeys, type ActionId,
 } from '../shortcuts';
 import { Modal } from './FeatureDialogs';
 
@@ -12,16 +13,11 @@ const close = () => useStore.setState({ dialog: null });
 
 interface Msg { id: ActionId; text: string; err: boolean }
 
-/** True when the key has Ctrl, Alt, Cmd or Win, or is a function key. Plain keys are for typing. */
-function usable(k: string): boolean {
-  const parts = k.split('+');
-  const key = parts[parts.length - 1];
-  return parts.slice(0, -1).some((m) => m !== 'Shift') || /^F\d{1,2}$/.test(key);
-}
+const BUILTIN_TIP = 'The editor keeps this key';
 
 export function KeyEditor() {
   // Re-render when keys or macros change.
-  useStore((s) => s.keys);
+  const keyMap = useStore((s) => s.keys);
   const macros = useStore((s) => s.macros);
   const [filter, setFilter] = useState('');
   const [recording, setRecording] = useState<ActionId | null>(null);
@@ -32,7 +28,7 @@ export function KeyEditor() {
     const f = filter.trim().toLowerCase();
     return ACTIONS.filter((a) => !f || a.label.toLowerCase().includes(f)
       || keysFor(a.id).some((k) => formatKey(k).toLowerCase().includes(f)));
-  }, [filter, recording, msg]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filter, keyMap]);
 
   useEffect(() => {
     if (!recording) return;
@@ -46,19 +42,14 @@ export function KeyEditor() {
       if (!k) return; // modifier only
       if (k === 'Esc') { setRecording(null); setMsg(null); return; }
       const shown = formatKey(k);
-      if (reservedKey(k)) {
-        setMsg({ id, err: true, text: `${shown}: The browser or OS keeps this key.` });
-        return;
-      }
-      if (!usable(k)) {
-        setMsg({ id, err: true, text: `${shown}: Add ${p === 'mac' ? '⌘, ⌃ or ⌥' : 'Ctrl or Alt'}, or use a function key.` });
-        return;
-      }
+      const err = (text: string) => setMsg({ id, err: true, text: `${shown}: ${text}` });
+      if (reservedKey(k)) { err('The browser or OS keeps this key.'); return; }
+      const problem = keyProblem(k);
+      if (problem) { err(problem); return; }
+      const owner = builtinOwner(k);
+      if (owner && owner !== id) { err(`${BUILTIN_TIP} for ${ACTION_BY_ID[owner].label}.`); return; }
       const macro = useStore.getState().macros.find((m) => m.shortcut && macroKey(m.shortcut) === k);
-      if (macro) {
-        setMsg({ id, err: true, text: `${shown}: Macro "${macro.name}" uses this key.` });
-        return;
-      }
+      if (macro) { err(`Macro "${macro.name}" uses this key.`); return; }
       setRecording(null);
       const mine = keysFor(id);
       if (mine.includes(k)) { setMsg(null); return; }
@@ -79,6 +70,7 @@ export function KeyEditor() {
 
   const reset = (id: ActionId) => {
     // Give the default keys back. Take them from other actions that use them now.
+    // Built-in keys never move, so no other action has them.
     const changes: Partial<Record<ActionId, string[] | null>> = { [id]: null };
     const moved: string[] = [];
     for (const k of defaultKeys(id)) {
@@ -100,6 +92,7 @@ export function KeyEditor() {
         <div className="key-list">
           {rows.map((a) => {
             const keys = keysFor(a.id);
+            const builtin = builtinKeys(a.id);
             const m = msg?.id === a.id ? msg : null;
             return (
               <div key={a.id} className="key-row" data-testid={`key-row-${a.id}`}>
@@ -108,7 +101,13 @@ export function KeyEditor() {
                   {recording === a.id ? (
                     <span className="key-recording" data-testid="key-recording">Press keys... (Esc cancels)</span>
                   ) : (
-                    keys.map((k) => (
+                    keys.map((k) => builtin.includes(k) ? (
+                      <span key={k} className="key-chip builtin" data-testid="key-chip" data-key={k} data-builtin=""
+                        title={BUILTIN_TIP}>
+                        <kbd>{formatKey(k)}</kbd>
+                        <span className="key-tag">built-in</span>
+                      </span>
+                    ) : (
                       <span key={k} className="key-chip" data-testid="key-chip" data-key={k}>
                         <kbd>{formatKey(k)}</kbd>
                         <button type="button" className="key-x" aria-label={`Remove ${formatKey(k)}`} data-testid="key-remove"

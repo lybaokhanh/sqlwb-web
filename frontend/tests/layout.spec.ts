@@ -736,3 +736,130 @@ test('key editor: a key of another action moves to this action', async ({ page }
   await expect(all.getByTestId('key-chip')).toHaveText(['Ctrl+Shift+E×']);
   await expect(dlg.getByTestId('key-row-execSelected').getByTestId('key-chip')).toHaveText(['Ctrl+E×']);
 });
+
+/** Opens the app with a saved workspace on the mock server. */
+async function startWithWorkspace(page: Page, doc: object) {
+  await page.goto(APP);
+  await page.evaluate((d) => localStorage.setItem('sqlwb.mock.workspace', JSON.stringify(d)), doc);
+  await page.reload();
+  await appLogin(page);
+  await dbLogin(page);
+}
+
+/** Records one key on the row of this action. */
+async function recordKey(page: Page, dlg: ReturnType<Page['getByRole']>, id: string, key: string) {
+  const row = dlg.getByTestId(`key-row-${id}`);
+  if (!(await row.getByTestId('key-recording').count())) await row.getByTestId('key-add').click();
+  await expect(row.getByTestId('key-recording')).toBeVisible();
+  await page.keyboard.press(key);
+  return row;
+}
+
+test('key editor: a key added to Undo runs it; Ctrl+Z in an input stays with the input', async ({ page }) => {
+  await start(page);
+  await typeSql(page, 'select 1');
+  const dlg = await openKeyEditor(page);
+  const row = await recordKey(page, dlg, 'undo', 'F9');
+  await expect(row.getByTestId('key-chip')).toHaveText(['Ctrl+Zbuilt-in', 'F9×']);
+  await dlg.getByRole('button', { name: 'Close' }).click();
+  await expect(dlg).toBeHidden();
+  // Ctrl+Z in the Max. rows field: the field keeps the focus, the editor text does not change.
+  const maxRows = page.locator('#max-rows');
+  await maxRows.click();
+  await maxRows.press('Control+a');
+  await page.keyboard.type('77');
+  await page.keyboard.press('Control+z');
+  expect(await page.evaluate(() => document.activeElement?.id)).toBe('max-rows');
+  await expect(page.locator('.monaco-editor .view-lines')).toContainText('select 1');
+  // F9 runs Undo in the editor.
+  await page.locator('.monaco-editor .view-lines').click();
+  await page.keyboard.press('F9');
+  await expect(page.locator('.monaco-editor .view-lines')).not.toContainText('select 1');
+});
+
+test('key editor: built-in editor keys cannot be removed or moved', async ({ page }) => {
+  await start(page);
+  const dlg = await openKeyEditor(page);
+  const replace = dlg.getByTestId('key-row-replace');
+  const chip = replace.getByTestId('key-chip');
+  await expect(chip).toHaveText(['Ctrl+Hbuilt-in']);
+  await expect(chip).toHaveAttribute('title', 'The editor keeps this key');
+  await expect(replace.getByTestId('key-remove')).toHaveCount(0);
+  // Another action cannot take the key.
+  const row = await recordKey(page, dlg, 'findInData', 'Control+H');
+  await expect(row.getByTestId('key-msg')).toHaveText('Ctrl+H: The editor keeps this key for Replace....');
+  await expect(row.getByTestId('key-recording')).toBeVisible();
+  await page.keyboard.press('Escape');
+  // Add a key to Replace, remove it, reset: the built-in key stays all the time.
+  await recordKey(page, dlg, 'replace', 'F8');
+  await expect(chip).toHaveText(['Ctrl+Hbuilt-in', 'F8×']);
+  await replace.getByTestId('key-remove').click();
+  await expect(chip).toHaveText(['Ctrl+Hbuilt-in']);
+  await recordKey(page, dlg, 'replace', 'F8');
+  await replace.getByTestId('key-reset').click();
+  await expect(chip).toHaveText(['Ctrl+Hbuilt-in']);
+  await expect(replace.getByTestId('key-reset')).toHaveCount(0);
+});
+
+test('key editor: Ctrl+Alt+letter (AltGr) and Ctrl+C / V / X / A are rejected on Windows', async ({ page }) => {
+  await start(page);
+  const dlg = await openKeyEditor(page);
+  let row = await recordKey(page, dlg, 'execAll', 'Control+Alt+Q');
+  await expect(row.getByTestId('key-msg')).toHaveText('Ctrl+Alt+Q: AltGr types characters with this key on many keyboards.');
+  row = await recordKey(page, dlg, 'execAll', 'Control+Alt+Shift+2');
+  await expect(row.getByTestId('key-msg')).toHaveText('Ctrl+Alt+Shift+2: AltGr types characters with this key on many keyboards.');
+  for (const k of ['C', 'V', 'X', 'A']) {
+    row = await recordKey(page, dlg, 'execAll', `Control+${k}`);
+    await expect(row.getByTestId('key-msg')).toHaveText(`Ctrl+${k}: Copy, paste, cut and select all need this key.`);
+  }
+  // Function keys and arrows stay allowed with Ctrl+Alt.
+  row = await recordKey(page, dlg, 'execAll', 'Control+Alt+F9');
+  await expect(row.getByTestId('key-chip')).toHaveText(['Ctrl+Shift+E×', 'Ctrl+Alt+F9×']);
+});
+
+test('macOS: Option+letter is rejected in the key editor, Cmd+Option+letter is allowed', async ({ page }) => {
+  await emulateOs(page, 'MacIntel');
+  await start(page);
+  const dlg = await openKeyEditor(page);
+  let row = await recordKey(page, dlg, 'execAll', 'Alt+E');
+  await expect(row.getByTestId('key-msg')).toHaveText('⌥E: Option types characters with this key.');
+  row = await recordKey(page, dlg, 'execAll', 'Alt+Shift+K');
+  await expect(row.getByTestId('key-msg')).toHaveText('⌥⇧K: Option types characters with this key.');
+  row = await recordKey(page, dlg, 'execAll', 'Meta+Alt+K');
+  await expect(row.getByTestId('key-chip')).toHaveText(['⇧⌘E×', '⌥⌘K×']);
+});
+
+test('macro with an old lower-case key (ctrl+semicolon) runs', async ({ page }) => {
+  await startWithWorkspace(page, { macros: [{ name: 'five', sql: 'select 5', shortcut: 'ctrl+semicolon' }] });
+  await page.locator('.monaco-editor .view-lines').click();
+  await page.keyboard.press('Control+;');
+  await expect(page.getByTestId('row-info')).toHaveText('5 rows');
+});
+
+test('Escape during IME composition does not close the dialog', async ({ page }) => {
+  await start(page);
+  await page.keyboard.press('Alt+C');
+  const dlg = page.getByRole('dialog', { name: 'Select Connection Profile' });
+  await expect(dlg).toBeVisible();
+  await page.evaluate(() => {
+    const target = document.activeElement ?? document.body;
+    target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', isComposing: true, bubbles: true }));
+  });
+  await page.waitForTimeout(200);
+  await expect(dlg).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dlg).toBeHidden();
+});
+
+test('saved keys get the canonical form: "Ctrl+E" on Windows loads as Mod+E and runs', async ({ page }) => {
+  await startWithWorkspace(page, {
+    keys: { win: { execCurrent: ['Ctrl+E', 'ctrl+e', '', 'Ctrl+', 42], execSelected: [] }, beos: { execAll: ['F2'] } },
+  });
+  const dlg = await openKeyEditor(page);
+  await expect(dlg.getByTestId('key-row-execCurrent').getByTestId('key-chip')).toHaveText(['Ctrl+E×']);
+  await expect(dlg.getByTestId('key-row-execCurrent').getByTestId('key-chip')).toHaveAttribute('data-key', 'Mod+E');
+  await dlg.getByRole('button', { name: 'Close' }).click();
+  await typeSql(page, 'select 9');
+  await page.keyboard.press('Control+E');
+  await expect(page.getByTestId('row-info')).toHaveText('9 rows');
+});

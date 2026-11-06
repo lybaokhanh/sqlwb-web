@@ -11,23 +11,29 @@ const close = () => useStore.setState({ dialog: null });
 // ---- Escape ----
 // Open dialogs (and the command palette), last opened at the end.
 // One window listener closes only the top entry, also when the focus is outside the dialog.
-const escStack: { close: () => void }[] = [];
+// An entry with `above` (the command palette) is drawn above all dialogs, so it closes first.
+const escStack: { close: () => void; above: boolean }[] = [];
 
 function onEscape(e: KeyboardEvent) {
   // An inner widget (Monaco, a key recorder) that uses Escape calls preventDefault.
   if (e.key !== 'Escape' || e.defaultPrevented) return;
-  const top = escStack[escStack.length - 1];
+  // Escape that cancels IME input (e.g. Vietnamese Telex) does not close the dialog.
+  if (e.isComposing || e.keyCode === 229) return;
+  const top = [...escStack].reverse().find((x) => x.above) ?? escStack[escStack.length - 1];
   if (!top) return;
   e.preventDefault();
   top.close();
 }
 
-/** Escape anywhere on the page calls onClose while this component is the top dialog. */
-export function useEscapeClose(onClose: () => void) {
+/**
+ * Escape anywhere on the page calls onClose while this component is the top dialog.
+ * above: the component is drawn above all dialogs (the command palette).
+ */
+export function useEscapeClose(onClose: () => void, above = false) {
   const ref = useRef(onClose);
   ref.current = onClose;
   useEffect(() => {
-    const entry = { close: () => ref.current() };
+    const entry = { close: () => ref.current(), above };
     escStack.push(entry);
     if (escStack.length === 1) window.addEventListener('keydown', onEscape);
     return () => {
@@ -35,7 +41,7 @@ export function useEscapeClose(onClose: () => void) {
       if (i >= 0) escStack.splice(i, 1);
       if (!escStack.length) window.removeEventListener('keydown', onEscape);
     };
-  }, []);
+  }, [above]);
 }
 
 // ---- Dialog size ----

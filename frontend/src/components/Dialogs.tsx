@@ -90,7 +90,8 @@ function CommandPalette() {
   }, [q]);
   const shut = () => useStore.setState({ palette: false });
   // Escape closes the palette also when the focus is not in the input.
-  useEscapeClose(shut);
+  // The palette is drawn above all dialogs, so Escape closes it first.
+  useEscapeClose(shut, true);
   const run = (i: number) => {
     const a = items[i];
     shut();
