@@ -6,6 +6,8 @@ Rules: [CONTRIBUTING.md](CONTRIBUTING.md#feature-docs-and-releases).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-06
+
 ### Added
 
 - **Ask for missing bind variables**: a run with `:name` without a value opens a dialog for the values. `$[?name]` always asks. [Docs](docs/features/bind-variables.md)
@@ -93,6 +95,7 @@ First release.
 
   ![Engine update](docs/images/engine-update.png)
 
-[Unreleased]: https://github.com/lybaokhanh/sqlwb-web/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/lybaokhanh/sqlwb-web/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/lybaokhanh/sqlwb-web/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/lybaokhanh/sqlwb-web/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/lybaokhanh/sqlwb-web/releases/tag/v0.1.0
