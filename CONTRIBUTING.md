@@ -36,6 +36,8 @@ A changed feature: update its doc page. Run step 2 again when the UI changed.
 4. Commit, then tag: `git tag -a vX.Y.Z -m vX.Y.Z`.
 5. Push the tag. `release.yml` makes the GitHub release. `docker.yml` pushes the image.
 
+The app version (`/api/version`) comes from the tag: `docker.yml` passes it as build argument `APP_VERSION`. Do not edit a version in the code.
+
 ### Checks
 
 | Check | Runs | Fails when |

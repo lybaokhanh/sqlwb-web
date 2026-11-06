@@ -75,7 +75,8 @@ public final class App {
 
   /** Runtime settings from environment variables. */
   public record Config(int port, Path dataDir, Path publicDir, String defaultName, String defaultUrl) {
-    static final String APP_VERSION = "0.1.0";
+    /** Set by the image build from the git tag (Dockerfile ARG APP_VERSION). Local runs: "dev". */
+    static final String APP_VERSION = System.getenv().getOrDefault("APP_VERSION", "dev");
 
     static Config fromEnv() {
       return new Config(
