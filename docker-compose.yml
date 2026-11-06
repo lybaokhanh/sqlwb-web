@@ -1,0 +1,28 @@
+# File format 2.4: works with docker-compose v1 and v2 and supports cpus/mem_limit.
+# Site values come from .env (copy config.example/sqlwb.env.example to .env).
+# Site-only options (dns_search, ...): docker-compose.override.yml, see config.example/.
+version: "2.4"
+services:
+  sqlwb-web:
+    image: ${SQLWB_IMAGE:-sqlwb-web:local}
+    build:
+      context: .
+      args:
+        WB_BUILD: "133"
+    container_name: ${SQLWB_NAME:-sqlwb-web}
+    restart: unless-stopped
+    ports:
+      - "${SQLWB_PORT:-8484}:8484"
+    environment:
+      DEFAULT_NAME: ${DEFAULT_NAME:-local}
+      DEFAULT_URL: ${DEFAULT_URL:-}
+      ADMIN_USERS: ${ADMIN_USERS:-}
+      SIGNUP: ${SIGNUP:-true}
+      JDBC_URL_ALLOW: ${JDBC_URL_ALLOW:-}
+    # Heap = 65% of the memory limit (Dockerfile)
+    cpus: ${CPUS:-2}
+    mem_limit: ${MEM:-3g}
+    volumes:
+      - sqlwb-data:/data
+volumes:
+  sqlwb-data:

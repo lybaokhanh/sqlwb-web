@@ -1,0 +1,9 @@
+# Site-only compose options. Copy to docker-compose.override.yml next to docker-compose.yml.
+# docker compose merges it automatically.
+version: "2.4"
+services:
+  sqlwb-web:
+    # Short DB host names resolve with this search domain
+    dns_search: example.internal
+    dns_opt:
+      - ndots:1
