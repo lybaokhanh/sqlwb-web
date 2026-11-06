@@ -1,0 +1,13 @@
+node_modules/
+target/
+dist/
+vendor/
+test-results/
+playwright-report/
+*.bak-*
+data/
+# Site config with real hosts and logins stays local (see config.example/)
+.env
+*.env
+!config.example/*.env.example
+docker-compose.override.yml
