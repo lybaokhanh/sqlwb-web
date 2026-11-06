@@ -32,7 +32,7 @@ function releaseNotes(tag, ref = tag) {
   }
   const repo = process.env.GITHUB_REPOSITORY ?? 'lybaokhanh/sqlwb-web';
   return m[1].trim()
-    .replace(/!\[([^\]]*)\]\((docs\/[^)]+)\)/g, `![$1](https://raw.githubusercontent.com/${repo}/${ref}/$2)`)
+    .replace(/!\[([^\]]*)\]\((docs\/[^)]+)\)/g, `![$1](https://github.com/${repo}/blob/${ref}/$2?raw=true)`)
     .replace(/(?<!!)\[([^\]]*)\]\((docs\/[^)]+)\)/g, `[$1](https://github.com/${repo}/blob/${ref}/$2)`);
 }
 
