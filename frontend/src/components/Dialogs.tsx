@@ -8,7 +8,7 @@ import { rememberedUser, rememberUser } from '../state/persist';
 import { ACTIONS, shortcutText } from '../shortcuts';
 import { isEnabled, runAction } from '../actions';
 import { startUpdate } from '../boot';
-import { BookmarksDialog, ConfirmDialog, ExportDialog, FilesDialog, KeysDialog, MacrosDialog, Modal } from './FeatureDialogs';
+import { BookmarksDialog, ConfirmDialog, ExportDialog, FilesDialog, KeysDialog, MacrosDialog, Modal, VarsDialog } from './FeatureDialogs';
 import { ConnectionManager } from "./ConnectionManager";
 import { CellDialog } from './CellDialog';
 import { upsertProfile } from "../state/profiles";
@@ -161,6 +161,7 @@ export function Dialogs() {
       )}
       {d?.kind === 'confirm' && <ConfirmDialog d={d} />}
       {d?.kind === 'keys' && <KeysDialog d={d} />}
+      {d?.kind === 'vars' && <VarsDialog key={d.reqId + d.names.join()} d={d} />}
       {d?.kind === 'macros' && <MacrosDialog />}
       {d?.kind === 'bookmarks' && <BookmarksDialog />}
       {d?.kind === 'files' && <FilesDialog />}

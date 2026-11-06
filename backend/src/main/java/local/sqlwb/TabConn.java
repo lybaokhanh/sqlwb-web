@@ -18,6 +18,7 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,12 @@ final class TabConn {
   private final ExecutorService worker;
   private final Map<String, Cursor> cursors = new LinkedHashMap<>();
   private final Map<String, String> vars = new java.util.concurrent.ConcurrentHashMap<>();
+  /** Values the user typed for missing variables: this run (asked once per run) and the last answers (prefill). */
+  private Map<String, String> runAnswers = new HashMap<>();
+  private final Map<String, String> lastAnswers = new java.util.concurrent.ConcurrentHashMap<>();
+  /** Open variable prompt: the worker waits on it. Null values = the user cancelled. */
+  private volatile java.util.concurrent.CompletableFuture<Map<String, String>> varReply;
+  private volatile String varReqId;
   private volatile Connection con;
   private volatile Statement running;
   private String url;
@@ -209,7 +216,41 @@ final class TabConn {
     });
   }
 
+  /** Answer of the browser to a varPrompt. values missing or null = cancel. */
+  void varValues(JsonNode m) {
+    var f = varReply;
+    if (f == null || !m.path("reqId").asText().equals(varReqId)) return;
+    JsonNode v = m.path("values");
+    if (!v.isObject()) {
+      f.complete(null);
+      return;
+    }
+    Map<String, String> out = new HashMap<>();
+    v.fields().forEachRemaining(e -> out.put(e.getKey(), e.getValue().asText("")));
+    f.complete(out);
+  }
+
+  /** Sends varPrompt and waits for the values (30 minutes at most). Null = cancelled. */
+  private Map<String, String> askValues(String reqId, int index, List<String> names) {
+    var f = new java.util.concurrent.CompletableFuture<Map<String, String>>();
+    varReqId = reqId;
+    varReply = f;
+    Map<String, String> prefill = new LinkedHashMap<>();
+    for (String n : names) prefill.put(n, vars.getOrDefault(n, lastAnswers.getOrDefault(n, "")));
+    send("varPrompt", "reqId", reqId, "index", index, "names", names, "values", prefill);
+    try {
+      return f.get(30, java.util.concurrent.TimeUnit.MINUTES);
+    } catch (Exception e) {
+      return null;
+    } finally {
+      varReply = null;
+      varReqId = null;
+    }
+  }
+
   void cancel() {
+    var f = varReply;
+    if (f != null) f.complete(null);
     WbBridge b = bridge;
     if (b != null && wbRunning) b.cancel();
     Statement s = running;
@@ -315,6 +356,7 @@ final class TabConn {
     try {
       requireCon();
       closeCursors();
+      runAnswers = new HashMap<>();
       String mode = m.path("mode").asText("current");
       String text = m.path("sql").asText();
       int maxResults = m.path("maxResults").asInt(20) > 0 ? m.path("maxResults").asInt(20) : 20;
@@ -385,7 +427,27 @@ final class TabConn {
       // Oracle hints (/*+ ... */) and PL/SQL keep their comments
       text = workbench.util.SqlUtil.makeCleanSql(text, true, false);
     }
-    Vars.Prepared sql = Vars.prepare(vars, text);
+    Map<String, String> scope = vars;
+    if (text.indexOf(':') >= 0 || text.contains("$[")) {
+      scope = new HashMap<>(vars);
+      scope.putAll(runAnswers);
+      List<String> need = Vars.missing(scope, runAnswers.keySet(), text);
+      if (!need.isEmpty()) {
+        Map<String, String> got = askValues(reqId, index, need);
+        if (got == null) {
+          send("message", "reqId", reqId, "level", "warn", "text", "Cancelled: no value for " + String.join(", ", need));
+          send("stmtEnd", "reqId", reqId, "index", index, "ms", ms(t0), "execMs", 0, "fetchMs", 0, "rows", 0, "error", true);
+          return false;
+        }
+        runAnswers.putAll(got);
+        lastAnswers.putAll(got);
+        scope.putAll(got);
+        StringBuilder used = new StringBuilder("Variables: ");
+        for (String n : need) used.append(used.length() > 11 ? ", " : "").append(n).append(" = '").append(got.getOrDefault(n, "")).append('\'');
+        send("message", "reqId", reqId, "level", "info", "text", used.toString());
+      }
+    }
+    Vars.Prepared sql = Vars.prepare(scope, text);
     Statement s = null;
     boolean keepOpen = false;
     double execMs = 0;

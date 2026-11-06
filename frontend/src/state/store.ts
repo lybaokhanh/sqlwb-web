@@ -138,7 +138,8 @@ export type Dialog =
   | { kind: 'bookmarks' }
   | { kind: 'files' }
   | { kind: 'export'; tabId: string; resultId: string }
-  | { kind: 'cell'; tabId: string; resultId: string; row: number; col: number };
+  | { kind: 'cell'; tabId: string; resultId: string; row: number; col: number }
+  | { kind: 'vars'; tabId: string; reqId: string; sql: string; names: string[]; values: Record<string, string> };
 
 export type AuthState = 'checking' | 'login' | 'ready';
 
@@ -559,6 +560,16 @@ async function executeIn(
   });
 }
 
+/** Last values typed for :name variables in this browser (prefill of the next prompt). */
+const varMemory = new Map<string, string>();
+
+/** Sends the values of a varPrompt. null = cancel: the run stops. */
+export function answerVars(tabId: string, reqId: string, values: Record<string, string> | null) {
+  if (values) for (const [k, v] of Object.entries(values)) varMemory.set(k, v);
+  set({ dialog: null });
+  client.send({ type: 'varValues', tabId, reqId, values });
+}
+
 export function cancelExec() {
   const tab = activeTab();
   if (tab?.running) client.send({ type: 'cancel', tabId: tab.id });
@@ -679,6 +690,12 @@ function flush() {
         if (m.reqId) formatWaiters.delete(m.reqId);
         tab.activeResult = 'messages';
         break;
+      case 'varPrompt': {
+        const sql = stmtSql.get(`${tab.id}:${m.index}`) ?? '';
+        const values = Object.fromEntries(m.names.map((n) => [n, varMemory.get(n) ?? m.values[n] ?? '']));
+        after.push(() => set({ dialog: { kind: 'vars', tabId: tab.id, reqId: m.reqId, sql, names: m.names, values } }));
+        break;
+      }
       case 'stmtStart':
         stmtSql.set(`${tab.id}:${m.index}`, m.sql);
         if (m.start != null) {
@@ -738,6 +755,7 @@ function flush() {
       }
       case 'execEnd':
         after.push(() => editorBridge.current.clearHighlight(tab.id));
+        after.push(() => { const d = get().dialog; if (d?.kind === 'vars' && d.reqId === m.reqId) set({ dialog: null }); });
         tab.running = false;
         tab.lastMs = m.ms;
         if (!m.ok) tab.activeResult = 'messages';

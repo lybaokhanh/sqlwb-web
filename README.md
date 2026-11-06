@@ -77,7 +77,7 @@ Template for a site: [config.example/](config.example/).
 | `Dockerfile`, `docker/entrypoint.sh`, `docker-compose.yml` | Image and run config |
 | `config.example/` | Site config template (env file, compose override) |
 | `scripts/deploy.sh` | Deploy on a Docker host with health check and rollback |
-| `scripts/smoke-ws.mjs`, `scripts/smoke-wb.mjs` | Protocol smoke tests against H2 |
+| `scripts/smoke-ws.mjs`, `scripts/smoke-wb.mjs`, `scripts/smoke-vars.mjs` | Protocol smoke tests against H2 |
 | `scripts/bench.mjs` | Benchmark against a real DB |
 | `.github/workflows/docker.yml` | Image build; tag `v*` pushes to GHCR |
 | [docs/benchmarks.md](docs/benchmarks.md) | Benchmark results |

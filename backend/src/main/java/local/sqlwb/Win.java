@@ -64,6 +64,7 @@ final class Win {
       case "execute" -> tab(tabId).execute(m);
       case "fetch" -> tab(tabId).fetch(m.path("resultId").asText(), m.path("count").asInt(TabConn.PAGE));
       case "cancel" -> tab(tabId).cancel();
+      case "varValues" -> tab(tabId).varValues(m);
       case "commit" -> tab(tabId).endTransaction(true);
       case "rollback" -> tab(tabId).endTransaction(false);
       case "format" -> tab(tabId).format(m.path("reqId").asText(), m.path("sql").asText());

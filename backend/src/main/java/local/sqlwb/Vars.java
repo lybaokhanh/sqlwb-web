@@ -1,9 +1,12 @@
 package local.sqlwb;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -16,6 +19,8 @@ final class Vars {
   private static final Pattern DEL = Pattern.compile("(?is)^\\s*wbvardelete\\s+([A-Za-z_][\\w.*]*)\\s*$");
   private static final Pattern LIST = Pattern.compile("(?is)^\\s*wbvarlist\\s*$");
   private static final Pattern TEXT_VAR = Pattern.compile("\\$\\[[&?]?([A-Za-z_][\\w.]*)]");
+  /** $[?name]: always ask. $[&name]: ask when not defined. */
+  private static final Pattern PROMPT_VAR = Pattern.compile("\\$\\[([&?])([A-Za-z_][\\w.]*)]");
   private static final Pattern PLSQL = Pattern.compile("(?is)^\\s*(begin|declare|create\\s+(or\\s+replace\\s+)?(editionable\\s+)?(trigger|procedure|function|package|type))\\b.*");
 
   /** SQL text with ? for each bind, and the bind values in order. */
@@ -77,9 +82,52 @@ final class Vars {
     return bindNamed(vars, text);
   }
 
-  /** Scans the SQL and skips strings, quoted names and comments. */
+  /**
+   * Names the user must give a value for before the statement runs, in order of first use:
+   * :name binds and $[&name] that are not defined, and every $[?name]. Names in {@code asked} are skipped.
+   * PL/SQL keeps :name (trigger :new/:old), so there only $[...] counts.
+   */
+  static List<String> missing(Map<String, String> vars, Set<String> asked, String sql) {
+    Set<String> out = new LinkedHashSet<>();
+    Matcher m = PROMPT_VAR.matcher(sql);
+    while (m.find()) {
+      String name = m.group(2);
+      if (!asked.contains(name) && (m.group(1).equals("?") || !vars.containsKey(name))) out.add(name);
+    }
+    String text = text(vars, sql);
+    if (!PLSQL.matcher(text).matches()) {
+      for (String name : namedBinds(text)) {
+        if (!vars.containsKey(name) && !asked.contains(name)) out.add(name);
+      }
+    }
+    return new ArrayList<>(out);
+  }
+
+  /** The :name binds of a statement, outside strings, quoted names and comments. */
+  static List<String> namedBinds(String sql) {
+    List<String> names = new ArrayList<>();
+    scan(sql, name -> {
+      names.add(name);
+      return null;
+    });
+    return names;
+  }
+
   private static Prepared bindNamed(Map<String, String> vars, String s) {
     List<String> binds = new ArrayList<>();
+    String sql = scan(s, name -> {
+      if (!vars.containsKey(name)) return null;
+      binds.add(vars.get(name));
+      return "?";
+    });
+    return new Prepared(sql, binds);
+  }
+
+  /**
+   * Scans the SQL and skips strings, quoted names and comments.
+   * For each :name, onName returns the replacement text, or null to keep :name.
+   */
+  private static String scan(String s, Function<String, String> onName) {
     StringBuilder out = new StringBuilder(s.length());
     int i = 0;
     int n = s.length();
@@ -106,9 +154,9 @@ final class Vars {
         int j = i + 1;
         while (j < n && (Character.isJavaIdentifierPart(s.charAt(j)) || s.charAt(j) == '.')) j++;
         String name = s.substring(i + 1, j);
-        if (vars.containsKey(name)) {
-          binds.add(vars.get(name));
-          out.append('?');
+        String r = onName.apply(name);
+        if (r != null) {
+          out.append(r);
         } else {
           out.append(s, i, j);
         }
@@ -118,7 +166,7 @@ final class Vars {
         i++;
       }
     }
-    return new Prepared(out.toString(), binds);
+    return out.toString();
   }
 
   private static String unquote(String v) {

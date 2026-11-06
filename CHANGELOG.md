@@ -8,6 +8,10 @@ Rules: [CONTRIBUTING.md](CONTRIBUTING.md#feature-docs-and-releases).
 
 ### Added
 
+- **Ask for missing bind variables**: a run with `:name` without a value opens a dialog for the values. `$[?name]` always asks. [Docs](docs/features/bind-variables.md)
+
+  ![Bind variables](docs/images/bind-variables.png)
+
 - Feature docs with demo images in [docs/features/](docs/features/README.md). `npm run docs:images` makes the images.
 - Release notes come from this file, with images. A PR check stops a `feat` change without docs.
 

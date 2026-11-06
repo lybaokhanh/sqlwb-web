@@ -60,6 +60,21 @@ export function mockFormat(sql: string): string {
   return out;
 }
 
+/** Like Vars.missing on the server: names that need a value before the statement runs. */
+function mockMissingVars(sql: string, defined: Map<string, string>, asked: Record<string, string>): string[] {
+  const out = new Set<string>();
+  for (const m of sql.matchAll(/\$\[([&?])([A-Za-z_][\w.]*)]/g)) {
+    if (!(m[2] in asked) && (m[1] === '?' || !defined.has(m[2]))) out.add(m[2]);
+  }
+  if (!/^\s*(begin|declare|create\s+(or\s+replace\s+)?(trigger|procedure|function|package))\b/i.test(sql)) {
+    const plain = sql.replace(/'(?:[^']|'')*'|"[^"]*"|--[^\n]*|\/\*[\s\S]*?\*\//g, ' ');
+    for (const m of plain.matchAll(/(?<![:\w]):([A-Za-z_][\w.]*)/g)) {
+      if (!defined.has(m[1]) && !(m[1] in asked)) out.add(m[1]);
+    }
+  }
+  return [...out];
+}
+
 export class MockServer {
   private sink: Emit = () => {};
   private batch: ServerMsg[] = [];
@@ -68,6 +83,9 @@ export class MockServer {
   private cancelled = new Set<string>();
   private connected = new Map<string, boolean>();
   private seq = 0;
+  private varWait = new Map<string, (v: Record<string, string> | null) => void>();
+  /** WbVarDef values per tab (mock: only `WbVarDef name=value`). */
+  private vars = new Map<string, Map<string, string>>();
 
   onMessage(cb: Emit) { this.sink = cb; }
 
@@ -109,6 +127,10 @@ export class MockServer {
         break;
       case 'cancel':
         this.cancelled.add(msg.tabId);
+        this.varWait.get(msg.tabId)?.(null);
+        break;
+      case 'varValues':
+        this.varWait.get(msg.tabId)?.(msg.values);
         break;
       case 'commit':
       case 'rollback':
@@ -210,6 +232,7 @@ export class MockServer {
     const open: string[] = [];
     const maxResults = m.maxResults > 0 ? m.maxResults : 20;
     let ok = true;
+    const answers: Record<string, string> = {};
     for (let index = 0; index < stmts.length; index++) {
       if (this.cancelled.has(tabId)) {
         this.emit({ type: 'message', tabId, reqId, level: 'warn', text: 'Statement cancelled.' });
@@ -219,6 +242,32 @@ export class MockServer {
       const { sql, start } = stmts[index];
       const s0 = performance.now();
       this.emit({ type: 'stmtStart', tabId, reqId, index, sql, start });
+      // Variables: :name and $[&name] without a value, every $[?name]. Ask once per run, like the server.
+      const def = sql.match(/^\s*wbvardef\s+([A-Za-z_][\w.]*)\s*=\s*(.*?)\s*;?\s*$/is);
+      if (def) {
+        if (!this.vars.has(tabId)) this.vars.set(tabId, new Map());
+        this.vars.get(tabId)!.set(def[1], def[2].replace(/^'(.*)'$/s, '$1'));
+        this.emit({ type: 'message', tabId, reqId, level: 'info', text: `Variable ${def[1]} defined with value '${def[2]}'` });
+        this.emit({ type: 'stmtEnd', tabId, reqId, index, ms: 0, execMs: 0, fetchMs: 0, rows: 0 });
+        continue;
+      }
+      const defined = this.vars.get(tabId) ?? new Map<string, string>();
+      const need = mockMissingVars(sql, defined, answers);
+      if (need.length) {
+        const values = await new Promise<Record<string, string> | null>((resolve) => {
+          this.varWait.set(tabId, resolve);
+          this.emit({ type: 'varPrompt', tabId, reqId, index, names: need, values: Object.fromEntries(need.map((n) => [n, defined.get(n) ?? ''])) });
+        });
+        this.varWait.delete(tabId);
+        if (!values) {
+          this.emit({ type: 'message', tabId, reqId, level: 'warn', text: `Cancelled: no value for ${need.join(', ')}` });
+          this.emit({ type: 'stmtEnd', tabId, reqId, index, ms: 0, error: true, execMs: 0, fetchMs: 0, rows: 0 });
+          ok = false;
+          break;
+        }
+        Object.assign(answers, values);
+        this.emit({ type: 'message', tabId, reqId, level: 'info', text: `Variables: ${need.map((n) => `${n} = '${values[n] ?? ''}'`).join(', ')}` });
+      }
       // Short pause only for small runs, so big scripts stay fast.
       if (stmts.length < 50) await sleep(40);
       const verb = sql.trim().split(/\s+/)[0].toLowerCase();
