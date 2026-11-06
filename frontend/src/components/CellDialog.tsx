@@ -106,7 +106,7 @@ export function CellDialog({ d }: { d: Extract<Dialog, { kind: 'cell' }> }) {
   };
 
   return (
-    <Modal title={`${col?.name ?? 'Value'} — row ${d.row + 1}`} onClose={close} xl>
+    <Modal title={`${col?.name ?? 'Value'} — row ${d.row + 1}`} onClose={close} xl sizeKey="cell">
       <div className="cell-dlg" data-testid="cell-dialog">
         <div className="cell-dlg-bar">
           <select aria-label="Language" value={lang} onChange={(e) => changeLang(e.target.value as CellLang)}>

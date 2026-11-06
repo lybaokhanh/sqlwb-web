@@ -140,7 +140,7 @@ export function ConnectionManager({ select }: { select?: string }) {
   };
 
   return (
-    <Modal title="Select Connection Profile" onClose={close} xl>
+    <Modal title="Select Connection Profile" onClose={close} xl sizeKey="connections">
       <div className="cm">
         <div className="cm-side">
           <div className="cm-tools">
