@@ -14,7 +14,7 @@ Since: v0.1.0
 
 ## Dialog size
 
-Since: Unreleased
+Since: v0.3.0
 
 | Item | Behavior |
 |---|---|

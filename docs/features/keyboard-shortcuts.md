@@ -1,6 +1,6 @@
 # Keyboard shortcuts per OS, change keys
 
-Since: Unreleased
+Since: v0.3.0
 
 ![Key editor](../images/keyboard-shortcuts.png)
 
