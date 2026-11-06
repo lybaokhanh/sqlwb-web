@@ -1,0 +1,32 @@
+# Feature docs check. Every PR and push to main.
+# A feat commit must change CHANGELOG.md, docs/features/ and docs/images/.
+# Rules: CONTRIBUTING.md#feature-docs-and-releases
+name: docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Links and images
+        if: github.event_name != 'pull_request'
+        run: node scripts/check-docs.mjs
+
+      - name: Links, images, feat commits need docs
+        if: github.event_name == 'pull_request'
+        run: node scripts/check-docs.mjs --pr origin/${{ github.base_ref }}
