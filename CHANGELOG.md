@@ -6,6 +6,10 @@ Rules: [CONTRIBUTING.md](CONTRIBUTING.md#feature-docs-and-releases).
 
 ## [Unreleased]
 
+### Fixed
+
+- `/api/version` shows the release version. The image build takes it from the git tag (it showed `0.1.0` in 0.2.0).
+
 ## [0.2.0] - 2026-11-06
 
 ### Added

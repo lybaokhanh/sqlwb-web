@@ -50,6 +50,9 @@ RUN chmod +x /entrypoint.sh \
  && SQLWB_EXIT_AFTER_START=1 DATA_DIR=/tmp/cds JAVA_OPTS="-XX:+UseZGC -XX:+ZGenerational -XX:ArchiveClassesAtExit=/opt/app/app.jsa" /entrypoint.sh \
  && rm -rf /tmp/cds && chmod 644 /opt/app/app.jsa
 USER app
+# Version for /api/version. The docker workflow passes the tag (v0.2.0 -> 0.2.0). Last layer only: no cache loss.
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
 ENV PORT=8484 DATA_DIR=/data PUBLIC_DIR=/opt/app/public \
     JAVA_OPTS="-XX:+UseZGC -XX:+ZGenerational -Xms256m -XX:MaxRAMPercentage=65 -XX:+ExitOnOutOfMemoryError -XX:SharedArchiveFile=/opt/app/app.jsa -Xlog:cds=off -Xlog:cds+dynamic=off"
 EXPOSE 8484
