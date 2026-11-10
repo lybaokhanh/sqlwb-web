@@ -6,6 +6,10 @@ Rules: [CONTRIBUTING.md](CONTRIBUTING.md#feature-docs-and-releases).
 
 ## [Unreleased]
 
+### Fixed
+
+- Oracle: `SET SERVEROUTPUT ON` works. It failed with ORA-00922. The log now shows the DBMS_OUTPUT lines after each statement. Other SQL*Plus display options (`SET ECHO`, `SET DEFINE`, ...) are skipped. [Docs](docs/features/sql-editor.md#sqlplus-commands-oracle)
+
 ## [0.3.0] - 2026-11-06
 
 ### Added

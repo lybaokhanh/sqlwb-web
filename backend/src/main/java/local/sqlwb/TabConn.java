@@ -60,6 +60,8 @@ final class TabConn {
   private workbench.sql.DelimiterDefinition altDelimiter;
   /** A DML ran since the last commit or rollback (for "Check uncommitted"). */
   private volatile boolean txOpen;
+  /** SET SERVEROUTPUT ON is active: the app reads DBMS_OUTPUT after each statement (Oracle only). */
+  private volatile boolean serverOutput;
 
   TabConn(String tabId, Win session) {
     this.tabId = tabId;
@@ -98,6 +100,7 @@ final class TabConn {
         parserType = SqlText.parserFor(url);
         opts = p;
         txOpen = false;
+        serverOutput = false;
         String alt = p.path("altDelimiter").asText("").strip();
         altDelimiter = alt.isEmpty() ? null : new workbench.sql.DelimiterDefinition(alt);
         String schema = p.path("defaultSchema").asText("").strip();
@@ -146,8 +149,11 @@ final class TabConn {
       String sql = st.sql();
       try {
         String own = Vars.handleCommand(vars, sql);
+        SqlPlus.Action plus = sqlPlus(sql);
         if (own != null) {
           send("message", "level", "info", "text", "Connect script: " + own);
+        } else if (plus != null) {
+          send("message", "level", "info", "text", "Connect script: " + applySqlPlus(plus, sql));
         } else if (bridge != null && bridge.handles(sql)) {
           WbBridge.Result r = bridge.run(Vars.text(vars, sql));
           if (!r.messages().isEmpty()) send("message", "level", r.ok() ? "info" : "error", "text", "Connect script: " + r.messages());
@@ -418,6 +424,18 @@ final class TabConn {
       send("stmtEnd", "reqId", reqId, "index", index, "ms", ms(t0), "execMs", ms(t0), "fetchMs", 0, "rows", 0);
       return true;
     }
+    SqlPlus.Action plus = sqlPlus(st.sql());
+    if (plus != null) {
+      try {
+        send("message", "reqId", reqId, "level", "info", "text", applySqlPlus(plus, st.sql()));
+        send("stmtEnd", "reqId", reqId, "index", index, "ms", ms(t0), "execMs", ms(t0), "fetchMs", 0, "rows", 0);
+        return true;
+      } catch (SQLException e) {
+        send("message", "reqId", reqId, "level", "error", "text", message(e) + "\n\n" + st.sql());
+        send("stmtEnd", "reqId", reqId, "index", index, "ms", ms(t0), "execMs", ms(t0), "fetchMs", 0, "rows", 0, "error", true);
+        return false;
+      }
+    }
     WbBridge b = bridge;
     if (b != null && b.handles(st.sql())) {
       return runWb(reqId, index, st, b, t0);
@@ -493,6 +511,7 @@ final class TabConn {
         isRs = s.getMoreResults();
       }
       if (!opts.path("hideWarnings").asBoolean(false)) warnings(reqId, s.getWarnings());
+      sendOutput(reqId);
       if (results == 0 && !keepOpen) {
         send("message", "reqId", reqId, "level", "info", "text", firstWord(st.sql()) + " executed successfully");
       }
@@ -505,6 +524,7 @@ final class TabConn {
         send("stmtEnd", "reqId", reqId, "index", index, "ms", ms(t0), "execMs", ms(t0), "fetchMs", 0, "rows", 0);
         return true;
       }
+      sendOutput(reqId); // lines written before the error
       send("message", "reqId", reqId, "level", "error", "text", message(e) + "\n\n" + st.sql());
       send("stmtEnd", "reqId", reqId, "index", index, "ms", ms(t0), "execMs", ms(t0), "fetchMs", 0, "rows", 0, "error", true);
       return false;
@@ -517,6 +537,51 @@ final class TabConn {
           // closing is best effort
         }
       }
+    }
+  }
+
+  /** SQL*Plus command of an Oracle script, or null (other databases: SET goes to the database). */
+  private SqlPlus.Action sqlPlus(String sql) {
+    return parserType == ParserType.Oracle ? SqlPlus.action(sql) : null;
+  }
+
+  /** Runs a SQL*Plus command and returns its message. */
+  private String applySqlPlus(SqlPlus.Action a, String sql) throws SQLException {
+    switch (a) {
+      case OUTPUT_ON -> {
+        try (Statement s = con.createStatement()) {
+          s.execute("begin dbms_output.enable(null); end;");
+        }
+        serverOutput = true;
+        return "DBMS_OUTPUT enabled";
+      }
+      case OUTPUT_OFF -> {
+        try (Statement s = con.createStatement()) {
+          s.execute("begin dbms_output.disable; end;");
+        }
+        serverOutput = false;
+        return "DBMS_OUTPUT disabled";
+      }
+      default -> {
+        return SqlPlus.skipped(sql);
+      }
+    }
+  }
+
+  /** Sends the waiting DBMS_OUTPUT lines as one message, when SET SERVEROUTPUT ON is active. */
+  private void sendOutput(String reqId) {
+    if (!serverOutput || con == null) return;
+    try (java.sql.CallableStatement cs = con.prepareCall(SqlPlus.READ_OUTPUT)) {
+      cs.registerOutParameter(1, Types.CLOB);
+      cs.execute();
+      Clob c = cs.getClob(1);
+      String text = c == null ? null : c.getSubString(1, (int) Math.min(c.length(), Integer.MAX_VALUE));
+      if (c != null) c.free();
+      if (text != null && !text.isEmpty()) {
+        send("message", "reqId", reqId, "level", "info", "text", "DBMS_OUTPUT:\n" + text.stripTrailing());
+      }
+    } catch (SQLException e) {
+      send("message", "reqId", reqId, "level", "warn", "text", "DBMS_OUTPUT not read: " + message(e));
     }
   }
 
@@ -549,6 +614,7 @@ final class TabConn {
         if (n == 0) send("rows", "resultId", id, "offset", 0, "rows", page, "done", true, "total", 0);
         rows += n;
       }
+      sendOutput(reqId);
       if (!r.messages().isEmpty()) {
         send("message", "reqId", reqId, "level", r.ok() ? "info" : "error", "text", r.messages());
       } else if (r.ok() && r.data().isEmpty()) {
