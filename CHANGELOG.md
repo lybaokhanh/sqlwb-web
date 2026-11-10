@@ -6,6 +6,12 @@ Rules: [CONTRIBUTING.md](CONTRIBUTING.md#feature-docs-and-releases).
 
 ## [Unreleased]
 
+### Added
+
+- **Compare tab** (Tools > Compare data): pick two connection profiles and schemas (A and B), type a SELECT or pick a table, and match the rows by key. Equal-when options, JSON and XML by path, status chips, resizable columns. Copy, insert or delete rows between A and B, edit cells with a line and word diff, review the SQL, save one transaction per schema. A new Compare tab starts with the last A and B. Fast on large results: a row click, filter or column drag does not compare all rows again. Dialogs can now be maximized. [Docs](docs/features/compare-tab.md)
+
+  ![Compare tab](docs/images/compare-tab.png)
+
 ## [0.3.1] - 2026-11-10
 
 ### Fixed

@@ -12,6 +12,6 @@ export const MENUS: Menu[] = [
   { title: 'SQL', items: ['execCurrent', 'execSelected', 'execAll', 'cancel', '-', 'reformat', 'completion', 'autoCompletion', 'jumpToStatement', '-', 'commit', 'rollback', '-', 'histFirst', 'histBack', 'histNext', 'histLast'] },
   { title: 'Macros', items: ['manageMacros', 'runMacro'], dynamic: 'macros' },
   { title: 'Workspace', items: ['saveWorkspace', 'loadWorkspace', '-', 'renameTab'] },
-  { title: 'Tools', items: ['dbExplorer', 'files', 'bookmarks', 'loadRun', '-', 'options', 'commandPalette'] },
+  { title: 'Tools', items: ['dbExplorer', 'compareData', 'files', 'bookmarks', 'loadRun', '-', 'options', 'commandPalette'] },
   { title: 'Help', items: ['shortcutList', 'about'] },
 ];

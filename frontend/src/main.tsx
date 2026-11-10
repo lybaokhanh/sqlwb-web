@@ -4,6 +4,7 @@ import { App } from './App';
 import { boot } from './boot';
 import { initTheme } from './theme';
 import './styles.css';
+import './compare.css';
 
 initTheme();
 createRoot(document.getElementById('root')!).render(

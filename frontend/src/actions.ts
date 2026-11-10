@@ -16,6 +16,7 @@ import { deleteRow, hasEdits, insertRow } from './state/edits';
 import { saveResultChanges } from './state/save';
 import { buildText, type ExportFormat } from './state/exporter';
 import { openExplorer } from './state/features';
+import { openCompareTab } from './compare/session';
 
 type Handler = () => void;
 const ed = () => editorBridge.current;
@@ -121,6 +122,7 @@ const handlers: Partial<Record<ActionId, Handler>> = {
   copyRow: () => { const t = activeTab(); const r = activeResult(); if (t && r && r.sel != null) insertRow(t.id, r.id, r.sel); },
   deleteRow: () => { const t = activeTab(); const r = activeResult(); if (t && r && r.sel != null) deleteRow(t.id, r.id, r.sel); },
   dbExplorer: openExplorer,
+  compareData: openCompareTab,
   manageMacros: () => useStore.setState({ dialog: { kind: 'macros' } }),
   runMacro: () => useStore.setState({ dialog: { kind: 'macros' } }),
   bookmarks: () => useStore.setState({ dialog: { kind: 'bookmarks' } }),
@@ -204,7 +206,8 @@ const conditions: Partial<Record<ActionId, () => boolean>> = {
   copyRow: () => { const r = activeResult(); return !!r?.table && r.sel != null; },
   deleteRow: () => { const r = activeResult(); return !!r?.table && r.sel != null; },
   dbExplorer: () => !!activeTab(),
-  loadRun: () => activeTab()?.kind !== 'explorer',
+  loadRun: () => activeTab()?.kind !== 'explorer' && activeTab()?.kind !== 'compare',
+  compareData: () => Object.keys(useStore.getState().profiles).length > 0,
   filter: () => !!activeResult(),
   findInData: () => !!activeResult(),
   optimizeWidths: () => !!activeResult(),
