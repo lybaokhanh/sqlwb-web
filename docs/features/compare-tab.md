@@ -1,6 +1,6 @@
 # Compare tab: compare and fix rows across schemas
 
-Since: Unreleased
+Since: v0.4.0
 
 ![Compare tab: APP_SETTINGS in SHOP_DEV and SHOP_TEST](../images/compare-tab.png)
 
