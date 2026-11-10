@@ -20,7 +20,7 @@ export type ActionId =
   | 'execCurrent' | 'execSelected' | 'execAll' | 'cancel' | 'reformat' | 'completion' | 'autoCompletion'
   | 'jumpToStatement' | 'commit' | 'rollback'
   | 'histFirst' | 'histBack' | 'histNext' | 'histLast'
-  | 'manageMacros' | 'runMacro' | 'dbExplorer' | 'files' | 'options' | 'shortcutList' | 'about';
+  | 'manageMacros' | 'runMacro' | 'dbExplorer' | 'compareData' | 'files' | 'options' | 'shortcutList' | 'about';
 
 export type Platform = 'mac' | 'win' | 'linux';
 
@@ -103,6 +103,7 @@ export const ACTIONS: ActionDef[] = [
   { id: 'manageMacros', label: 'Manage macros...', keys: ['Mod+M'], mac: ['Mod+Shift+M'] },
   { id: 'runMacro', label: 'Run macro...' },
   { id: 'dbExplorer', label: 'DB Explorer', keys: ['Mod+D'] },
+  { id: 'compareData', label: 'Compare data...' },
   { id: 'files', label: 'Files (WbExport / WbImport)...' },
   { id: 'options', label: 'Options...' },
   { id: 'bookmarks', label: 'Bookmarks...' },

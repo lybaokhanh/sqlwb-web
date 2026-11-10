@@ -89,8 +89,8 @@ export interface StmtStat {
 
 export interface Tab {
   id: string;
-  /** 'explorer' = DB Explorer tab (own connection, same profile). */
-  kind?: 'sql' | 'explorer';
+  /** 'explorer' = DB Explorer tab (own connection, same profile). 'compare' = Compare tab (no own connection). */
+  kind?: 'sql' | 'explorer' | 'compare';
   /** Explorer: the SQL tab it was opened from. */
   sourceTabId?: string;
   load?: LoadRun;
@@ -122,6 +122,8 @@ export interface Tab {
   histPos: number;
   filterOpen: boolean;
   filterText: string;
+  /** Compare tab (data in compare/session.ts). v bumps on each change. */
+  compare?: { v: number };
 }
 
 export type Dialog =
@@ -195,6 +197,7 @@ export function fetchAll(tabId: string, resultId: string) {
 const passwords = new Map<string, string>();
 export function setPassword(profileId: string, pw: string) { passwords.set(profileId, pw); }
 export function hasPassword(profileId: string) { return passwords.has(profileId); }
+export function forgetPassword(profileId: string) { passwords.delete(profileId); }
 /** For the load run only: it needs the password the user typed this session. */
 export function getPassword(profileId: string) { return passwords.get(profileId); }
 
@@ -292,7 +295,10 @@ client.subscribeAll((m) => {
 
 /** The engine's completion list for the cursor position. Null when the tab is not connected or the server is slow (3 s). */
 export function requestCompletion(tabId: string, sql: string, cursor: number): Promise<CompletionMsg | null> {
-  if (get().tabs.find((t) => t.id === tabId)?.conn !== 'connected') return Promise.resolve(null);
+  const t = get().tabs.find((x) => x.id === tabId);
+  // A Compare tab completes on its hidden A connection.
+  if (t?.kind === 'compare') tabId = `${tabId}~cmpA`;
+  else if (t?.conn !== 'connected') return Promise.resolve(null);
   const reqId = newId('c');
   return new Promise((resolve) => {
     const timer = window.setTimeout(() => { completionWaiters.delete(reqId); resolve(null); }, 3000);
@@ -359,7 +365,8 @@ export function openTabFor(profileId: string) {
  */
 export function switchTabProfile(profileId: string) {
   const all = get().tabs;
-  let targets = all.filter((t) => !t.running && !(t.profileId === profileId && t.conn === 'connected'));
+  // A Compare tab picks its own connections (A and B): it does not follow.
+  let targets = all.filter((t) => t.kind !== 'compare' && !t.running && !(t.profileId === profileId && t.conn === 'connected'));
   const busy = all.filter((t) => t.running && t.profileId !== profileId);
   if (!targets.length && !all.some((t) => !t.running)) { openTabFor(profileId); return; }
   const go = () => {
@@ -437,9 +444,29 @@ export function disconnectTab(id: string) {
   if (tab) askUncommitted(tab, 'disconnect', () => client.send({ type: 'disconnect', tabId: id }));
 }
 
+/** Set by compare/session.ts (the store does not import it: no import cycle). */
+export const compareHooks: {
+  run?: (tabId: string) => void;
+  /** Pending (not saved) statements of a Compare tab. */
+  pending?: (tabId: string) => number;
+  drop?: (tabId: string) => void;
+} = {};
+
 export function closeTab(id: string) {
   const tab = get().tabs.find((t) => t.id === id);
-  if (tab && get().tabs.length > 1) askUncommitted(tab, 'close the tab', () => closeTabNow(id));
+  if (!tab || get().tabs.length <= 1) return;
+  const n = tab.kind === 'compare' ? compareHooks.pending?.(id) ?? 0 : 0;
+  if (n) {
+    set({
+      dialog: {
+        kind: 'confirm', title: 'Close Compare', danger: true, okLabel: 'Discard and close',
+        text: `${n} pending change(s) in "${tab.title}" are not saved. They are lost when you close it.`,
+        onOk: () => closeTabNow(id),
+      },
+    });
+    return;
+  }
+  askUncommitted(tab, 'close the tab', () => closeTabNow(id));
 }
 
 function closeTabNow(id: string) {
@@ -449,6 +476,7 @@ function closeTabNow(id: string) {
   const tab = s.tabs[idx];
   if (!tab) return;
   if (tab.conn === 'connected' || tab.conn === 'connecting') client.send({ type: 'disconnect', tabId: id });
+  if (tab.kind === 'compare') compareHooks.drop?.(id);
   tab.results.forEach((r) => dropRows(r.id));
   editorBridge.current.disposeTab(id);
   const tabs = s.tabs.filter((t) => t.id !== id);
@@ -489,6 +517,7 @@ export function moveTab(from: number, to: number) {
 export function execute(mode: ExecMode) {
   const tab = activeTab();
   if (!tab || tab.running || tab.kind === 'explorer') return Promise.resolve();
+  if (tab.kind === 'compare') { compareHooks.run?.(tab.id); return Promise.resolve(); }
   const snap = editorBridge.current.snapshot(tab.id) ?? {
     sql: tab.sql, cursor: tab.sql.length, selStart: 0, selEnd: 0,
   };

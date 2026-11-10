@@ -70,6 +70,17 @@ function loadSize(key: string): Size | null {
   return null;
 }
 
+const MAX_PREFIX = 'sqlwb.dialogMax.';
+function loadMax(key: string): boolean {
+  try { return localStorage.getItem(MAX_PREFIX + key) === '1'; } catch { return false; }
+}
+function saveMax(key: string, on: boolean) {
+  try {
+    if (on) localStorage.setItem(MAX_PREFIX + key, '1');
+    else localStorage.removeItem(MAX_PREFIX + key);
+  } catch { /* storage blocked */ }
+}
+
 function saveSize(key: string, s: Size | null) {
   try {
     if (s) localStorage.setItem(SIZE_PREFIX + key, JSON.stringify(s));
@@ -81,12 +92,18 @@ function saveSize(key: string, s: Size | null) {
  * Dialog frame. Escape closes it from anywhere on the page. The user can resize it.
  * sizeKey: stable name for the saved size. Set it when the title changes (e.g. contains a name).
  */
-export function Modal({ title, onClose, children, wide, xl, sizeKey }: {
+export function Modal({ title, onClose, children, wide, xl, sizeKey, maximizable, titleNode }: {
   title: string; onClose: () => void; children: React.ReactNode; wide?: boolean; xl?: boolean; sizeKey?: string;
+  /** Title bar gets a maximize button; a double-click on the title also maximizes. Kept per dialog. */
+  maximizable?: boolean;
+  /** Rich title (the plain title stays the accessible name). */
+  titleNode?: React.ReactNode;
 }) {
   const key = sizeKey ?? title;
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<Size | null>(() => loadSize(key));
+  const [max, setMax] = useState<boolean>(() => !!maximizable && loadMax(key));
+  const toggleMax = () => setMax((m) => { saveMax(key, !m); return !m; });
   useEscapeClose(onClose);
 
   // Move the focus into the dialog when no element inside took it (autoFocus).
@@ -124,9 +141,16 @@ export function Modal({ title, onClose, children, wide, xl, sizeKey }: {
 
   return (
     <div className="modal-back" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={box} tabIndex={-1} className={`modal${wide ? ' wide' : ''}${xl ? ' xl' : ''}${size ? ' sized' : ''}`}
-        role="dialog" aria-label={title} style={size ? { width: size.w, height: size.h } : undefined}>
-        <div className="modal-title">{title}</div>
+      <div ref={box} tabIndex={-1} className={`modal${wide ? ' wide' : ''}${xl ? ' xl' : ''}${size || max ? ' sized' : ''}${max ? ' max' : ''}`}
+        role="dialog" aria-label={title} style={size && !max ? { width: size.w, height: size.h } : undefined}>
+        {maximizable ? (
+          <div className="modal-title bar" onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button')) toggleMax(); }}>
+            <span className="modal-title-text">{titleNode ?? title}</span>
+            <button type="button" className="modal-x" onClick={toggleMax} aria-label={max ? 'Restore size' : 'Maximize'}
+              title="Maximize or restore (or double-click the title bar)">{max ? '⤡' : '⤢'}</button>
+            <button type="button" className="modal-x" onClick={onClose} aria-label="Close">✕</button>
+          </div>
+        ) : <div className="modal-title">{title}</div>}
         <div className="modal-body">{children}</div>
         <div className="modal-grip" data-testid="modal-grip" title="Drag to resize. Double-click: default size."
           onPointerDown={startResize} onDoubleClick={resetSize} />

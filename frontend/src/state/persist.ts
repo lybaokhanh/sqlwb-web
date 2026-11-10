@@ -15,7 +15,7 @@ const FALLBACK_KEY = 'sqlwb.workspace.v2';
 export function toDoc(): WorkspaceDoc {
   const s = useStore.getState();
   return {
-    tabs: s.tabs.filter((t) => t.kind !== 'explorer').map((t) => {
+    tabs: s.tabs.filter((t) => t.kind !== 'explorer' && t.kind !== 'compare').map((t) => {
       const p = s.profiles[t.profileId];
       const connection: WorkspaceConnection | undefined = p
         ? {
@@ -26,7 +26,7 @@ export function toDoc(): WorkspaceDoc {
         : undefined;
       return { id: t.id, title: t.title, sql: t.sql, cursor: t.cursor, connection, split: t.split, history: t.history.slice(-20) };
     }),
-    activeTab: s.tabs.find((t) => t.id === s.activeTabId)?.kind === 'explorer' ? undefined : s.activeTabId,
+    activeTab: ['explorer', 'compare'].includes(s.tabs.find((t) => t.id === s.activeTabId)?.kind ?? '') ? undefined : s.activeTabId,
     theme: getTheme(),
     maxRows: s.maxRows,
     timeout: s.timeout,

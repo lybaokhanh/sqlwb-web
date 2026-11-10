@@ -260,3 +260,29 @@ test('keyboard-shortcuts', async ({ page }) => {
   await dlg.getByTestId('key-row-execAll').getByTestId('key-add').click();
   await shot(page, 'keyboard-shortcuts');
 });
+
+test('compare-tab', async ({ page }) => {
+  await start(page);
+  await menu(page, 'Tools', 'Compare data...');
+  const cmp = page.getByTestId('compare');
+  await cmp.getByLabel('Schema of A').selectOption('SHOP_DEV');
+  await cmp.getByLabel('Schema of B').selectOption('SHOP_TEST');
+  await typeSql(page, "select * from SHOP_DEV.APP_SETTINGS where SETTING_KEY like 'mail.%'");
+  await page.keyboard.press('Escape');
+  await cmp.getByTestId('compare-run').click();
+  await expect(cmp.getByTestId('compare-status')).toContainText('Compared 14 + 14 rows');
+  const match = cmp.locator('fieldset', { hasText: 'Match rows by' });
+  const ign = cmp.locator('fieldset', { hasText: 'Ignore columns' });
+  await match.getByLabel('SETTING_ID').uncheck();
+  await match.getByLabel('SETTING_KEY').check();
+  await ign.getByLabel('SETTING_ID').check();
+  await ign.getByLabel('UPDATED_AT').check();
+  await cmp.locator('tbody tr', { hasText: 'mail.timeout.ms' }).getByRole('button', { name: 'A → B' }).click();
+  // Small editor: more room for the grid.
+  const sp = await page.locator('.splitter').boundingBox();
+  await page.mouse.move(sp!.x + 200, sp!.y + 2);
+  await page.mouse.down();
+  await page.mouse.move(sp!.x + 200, 150, { steps: 5 });
+  await page.mouse.up();
+  await shot(page, 'compare-tab');
+});

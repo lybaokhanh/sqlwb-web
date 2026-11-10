@@ -1,7 +1,7 @@
 // In-memory fake server. Same messages as the real backend.
 // On with URL ?mock=1, or by itself in dev when /ws fails.
 import type {
-  ClientMsg, ColumnInfo, CompletionItem, DbObject, ExecuteMsg, FileInfo, LoadStartMsg, LoadStats, MetaMsg, ServerFrame, ServerMsg, SessionResponse, UpdateInfo, UpdateStarted, WorkspaceDoc, ProfilesDoc, SavedProfile, TestResult,
+  ClientMsg, ColumnInfo, CompletionItem, DbObject, RowChange, ExecuteMsg, FileInfo, LoadStartMsg, LoadStats, MetaMsg, ServerFrame, ServerMsg, SessionResponse, UpdateInfo, UpdateStarted, WorkspaceDoc, ProfilesDoc, SavedProfile, TestResult,
 } from './protocol';
 import { FIRST_PAGE_ROWS } from './protocol';
 import { HttpError } from "./errors";
@@ -9,7 +9,91 @@ import { splitStatements, statementAt } from '../sql/split';
 
 type Emit = (m: ServerFrame) => void;
 
-interface MockResult { tabId: string; total: number; cols: ColumnInfo[] }
+interface MockResult { tabId: string; total: number; cols: ColumnInfo[]; data?: unknown[][] }
+
+// ---- Sample table for the Compare tab: one config table in three schemas (neutral data) ----
+const SETTINGS_COLS: ColumnInfo[] = [
+  { name: 'SETTING_ID', typeName: 'NUMBER(10)', jdbcType: 2, nullable: false },
+  { name: 'SETTING_KEY', typeName: 'VARCHAR2(100)', jdbcType: 12, nullable: false },
+  { name: 'SETTING_VALUE', typeName: 'VARCHAR2(4000)', jdbcType: 12, nullable: true },
+  { name: 'DESCRIPTION', typeName: 'VARCHAR2(200)', jdbcType: 12, nullable: true },
+  { name: 'UPDATED_AT', typeName: 'DATE', jdbcType: 91, nullable: true },
+];
+const SETTINGS: Record<string, unknown[][]> = {
+  SHOP_DEV: [
+    [101, 'mail.transport', 'smtp', 'Transport', '2026-10-02'],
+    [102, 'mail.host', 'smtp.dev.example.com', 'SMTP host', '2026-10-02'],
+    [103, 'mail.timeout.ms', '3000', 'Request timeout', '2026-09-11'],
+    [104, 'mail.retry', '3', 'Retry count', '2026-09-11'],
+    [105, 'mail.from', 'noreply@dev.example.com', 'Sender address', '2026-08-30'],
+    [106, 'mail.tls', 'starttls', 'TLS mode', '2026-08-30'],
+    [107, 'mail.cache.ttl', '600', 'Queue poll (s)', '2026-07-14'],
+    [108, 'mail.queue.table', 'SHOP_DEV.MAIL_QUEUE', 'Queue table', '2026-07-14'],
+    [109, 'mail.enabled', 'Y', 'Feature flag', '2026-06-01'],
+    [110, 'mail.debug', 'true', 'Verbose log', '2026-11-01'],
+    [111, 'mail.audit', 'ON ', 'Audit mode', '2026-06-01'],
+    [112, 'mail.rate.limit', '12.50', 'Calls/s', '2026-06-01'],
+    [113, 'mail.retry.policy', '{"max":3,"backoff":"exponential","delays":[1,5,30],"notify":{"onFail":true,"to":"ops@dev.example.com"}}', 'Retry policy (JSON)', '2026-10-05'],
+    [114, 'mail.template.welcome', '<template lang="en" format="html"><subject>Welcome to the shop</subject><from>noreply@dev.example.com</from><footer>See you soon</footer></template>', 'Welcome mail (XML)', '2026-10-05'],
+  ],
+  SHOP_TEST: [
+    [201, 'mail.transport', 'smtp', 'Transport', '2026-10-20'],
+    [202, 'mail.host', 'smtp.test.example.com', 'SMTP host', '2026-10-20'],
+    [203, 'mail.timeout.ms', '5000', 'Request timeout', '2026-09-12'],
+    [204, 'mail.retry', '3', 'Retry count', '2026-09-12'],
+    [205, 'mail.from', 'noreply@test.example.com', 'Sender address', '2026-08-30'],
+    [206, 'mail.tls', 'STARTTLS', 'TLS mode', '2026-08-30'],
+    [207, 'mail.cache.ttl', '600', 'Queue poll (s)', '2026-07-15'],
+    [208, 'mail.queue.table', 'SHOP_TEST.MAIL_QUEUE', 'Queue table', '2026-07-15'],
+    [209, 'mail.enabled', 'Y', 'Feature flag', '2026-06-03'],
+    [211, 'mail.audit', 'on', 'Audit mode', '2026-06-03'],
+    [212, 'mail.rate.limit', '12.5', 'Calls/s', '2026-06-03'],
+    [213, 'mail.fallback.host', 'smtp2.test.example.com', 'Backup host', '2026-10-20'],
+    [214, 'mail.retry.policy', '{\n  "backoff": "exponential",\n  "max": 5,\n  "delays": [1, 5, 30, 120],\n  "notify": {"to": "ops@test.example.com", "onFail": true}\n}', 'Retry policy (JSON)', '2026-10-21'],
+    [215, 'mail.template.welcome', '<template format="html" lang="en">\n  <subject>Welcome to our shop</subject>\n  <from>noreply@test.example.com</from>\n  <footer>See you soon</footer>\n</template>', 'Welcome mail (XML)', '2026-10-21'],
+  ],
+  SHOP_UAT: [
+    [301, 'mail.transport', 'smtp', 'Transport', '2026-10-25'],
+    [302, 'mail.host', 'smtp.uat.example.com', 'SMTP host', '2026-10-25'],
+    [303, 'mail.timeout.ms', '3000', 'Request timeout', '2026-09-12'],
+    [304, 'mail.retry', '3', 'Retry count', '2026-09-12'],
+    [305, 'mail.from', 'noreply@uat.example.com', 'Sender address', '2026-08-30'],
+    [306, 'mail.tls', 'starttls', 'TLS mode', '2026-08-30'],
+    [307, 'mail.cache.ttl', '900', 'Queue poll (s)', '2026-07-15'],
+    [308, 'mail.queue.table', 'SHOP_UAT.MAIL_QUEUE', 'Queue table', '2026-07-15'],
+    [309, 'mail.enabled', 'N', 'Feature flag', '2026-06-03'],
+    [311, 'mail.audit', 'ON', 'Audit mode', '2026-06-03'],
+    [312, 'mail.rate.limit', '12.4', 'Calls/s', '2026-06-03'],
+    [313, 'mail.retry.policy', '{"backoff":"exponential","delays":[30,5,1],"max":3,"notify":{"onFail":true,"to":"ops@uat.example.com"}}', 'Retry policy (JSON)', '2026-10-25'],
+    [314, 'mail.template.welcome', '<template format="html" lang="en"><subject>Welcome to the shop</subject><from>noreply@uat.example.com</from><footer>See you soon</footer></template>', 'Welcome mail (XML)', '2026-10-25'],
+  ],
+};
+
+/** Saved changes to "<schema>.APP_SETTINGS" change the sample rows (rows are found by SETTING_ID). */
+function applySettings(table: string, changes: RowChange[]) {
+  const m = table.match(/^"?(\w+)"?\."?app_settings"?$/i);
+  const rows = m ? SETTINGS[m[1].toUpperCase()] : undefined;
+  if (!rows) return;
+  const names = SETTINGS_COLS.map((c) => c.name);
+  const find = (key: Record<string, unknown>) => rows.findIndex((r) => String(r[0]) === String(key.SETTING_ID));
+  for (const ch of changes) {
+    if (ch.op === 'delete') { const i = find(ch.key); if (i >= 0) rows.splice(i, 1); }
+    else if (ch.op === 'update') { const r = rows[find(ch.key)]; if (r) Object.entries(ch.values).forEach(([k, v]) => { r[names.indexOf(k)] = v; }); }
+    else rows.push(names.map((n) => ch.values[n] ?? null));
+  }
+}
+
+/** Rows of APP_SETTINGS for a query, or null when the query does not read it. Schema: from the SQL, else SHOP_DEV. */
+function settingsFor(sql: string): unknown[][] | null {
+  const m = sql.match(/\bfrom\s+(?:"?(\w+)"?\.)?"?app_settings"?/i);
+  if (!m) return null;
+  const rows = SETTINGS[(m[1] ?? 'SHOP_DEV').toUpperCase()];
+  if (!rows) return [];
+  const like = sql.match(/setting_key\s+like\s+'([^']*)'/i);
+  if (!like) return rows;
+  const re = new RegExp(`^${like[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/_/g, '.')}$`);
+  return rows.filter((r) => re.test(String(r[1])));
+}
 
 const COLS = 20;
 const KEYWORDS = [
@@ -153,7 +237,7 @@ export class MockServer {
         }
         const end = Math.min(r.total, msg.offset + msg.count);
         const rows: unknown[][] = [];
-        for (let i = msg.offset; i < end; i++) rows.push(row(i, r.cols.includes(JSON_COL)));
+        for (let i = msg.offset; i < end; i++) rows.push(r.data ? r.data[i] : row(i, r.cols.includes(JSON_COL)));
         this.later({ type: 'rows', tabId: msg.tabId, resultId: msg.resultId, offset: msg.offset, rows, done: end >= r.total, total: r.total }, 5);
         break;
       }
@@ -167,6 +251,7 @@ export class MockServer {
         break;
       }
       case 'saveChanges':
+        applySettings(msg.table, msg.changes);
         this.later({ type: 'saved', tabId: msg.tabId, reqId: msg.reqId, count: msg.changes.length }, 60);
         break;
       case 'loadStart':
@@ -279,7 +364,16 @@ export class MockServer {
         ok = false;
         continue;
       }
-      if (verb === 'select' || verb === 'with') {
+      const settings = verb === 'select' ? settingsFor(sql) : null;
+      if (settings) {
+        const resultId = `m${++this.seq}`;
+        this.results.set(resultId, { tabId, total: settings.length, cols: SETTINGS_COLS, data: settings });
+        this.emit({ type: 'resultMeta', tabId, reqId, resultId, sql, columns: SETTINGS_COLS });
+        this.emit({ type: 'rows', tabId, resultId, offset: 0, rows: settings.map((r) => r.slice()), done: true, total: settings.length });
+        this.emit({ type: 'message', tabId, reqId, level: 'info', text: `${settings.length} rows retrieved` });
+        affected = settings.length;
+        open.push(resultId);
+      } else if (verb === 'select' || verb === 'with') {
         const num = sql.match(/\d+/);
         let total = num ? parseInt(num[0], 10) : 50;
         if (m.maxRows > 0) total = Math.min(total, m.maxRows);
@@ -340,7 +434,7 @@ function mockMeta(m: MetaMsg): unknown {
   const obj = MOCK_OBJECTS.find((o) => o.name === (m.name ?? '').toUpperCase().split('.').pop());
   switch (m.what) {
     case 'schemas':
-      return ['HR', 'SCOTT', 'SYS', 'SYSTEM'];
+      return ['HR', 'SCOTT', 'SHOP_DEV', 'SHOP_TEST', 'SHOP_UAT', 'SYS', 'SYSTEM'];
     case 'tableTypes':
       return ['SYNONYM', 'TABLE', 'VIEW', 'SEQUENCE', 'TYPE'];
     case 'objects': {
@@ -378,6 +472,7 @@ function mockMeta(m: MetaMsg): unknown {
         { name: `IX_${obj.name}_NAME`, unique: false, column: 'NAME_1', position: 1 },
       ];
     case 'pk':
+      if ((m.name ?? '').toUpperCase() === 'APP_SETTINGS') return ['SETTING_ID'];
       if (!obj) return [];
       return obj.name === 'BONUS' ? [] : ['ID'];
     case 'source': {

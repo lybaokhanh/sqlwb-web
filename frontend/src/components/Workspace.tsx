@@ -5,6 +5,7 @@ import { useRef } from 'react';
 import { EditorPane } from './EditorPane';
 import { ResultPanel, useActiveTab } from './ResultPanel';
 import { ExplorerView } from './ExplorerView';
+import { CompareView } from './ComparePanel';
 import { updateTab } from '../state/store';
 
 export function Workspace() {
@@ -43,7 +44,7 @@ export function Workspace() {
           <>
             <div className="splitter" role="separator" aria-orientation="horizontal" onPointerDown={onDown}
               onDoubleClick={() => tab && updateTab(tab.id, { split: 0.45 })} />
-            <div className="ws-result">{tab && !explorer && <ResultPanel tab={tab} />}</div>
+            <div className="ws-result">{tab && !explorer && (tab.kind === 'compare' ? <CompareView tab={tab} /> : <ResultPanel tab={tab} />)}</div>
           </>
         )}
       </div>
