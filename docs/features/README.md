@@ -23,6 +23,6 @@ One page per feature. Each page has a demo image from `docs/images/`.
 | [Cell dialog for long values](cell-dialog.md) | v0.1.1 |
 | [Bind variables: ask for missing values](bind-variables.md) | v0.2.0 |
 | [Keyboard shortcuts per OS, change keys](keyboard-shortcuts.md) | v0.3.0 |
-| [Compare tab: compare and fix rows across schemas](compare-tab.md) | Unreleased |
+| [Compare tab: compare and fix rows across schemas](compare-tab.md) | v0.4.0 |
 
 New feature: follow [CONTRIBUTING.md](../../CONTRIBUTING.md#feature-docs-and-releases).
