@@ -30,3 +30,16 @@ Since: v0.1.0
 
 Open Help → Keyboard shortcuts. Click **+ Add** in the row of the action and press the new key.
 The workspace saves the keys, per OS. Details: [Keyboard shortcuts](keyboard-shortcuts.md).
+
+## SQL*Plus commands (Oracle)
+
+Oracle does not know SQL*Plus commands (ORA-00922). The app handles them itself.
+
+| Command | Behavior |
+|---|---|
+| `SET SERVEROUTPUT ON` (also `ENABLEOUT`) | Turns on DBMS_OUTPUT. After each statement, the log shows the lines as a `DBMS_OUTPUT:` message, also when the statement fails |
+| `SET SERVEROUTPUT OFF` (also `DISABLEOUT`) | Turns off DBMS_OUTPUT |
+| `SET ECHO`, `SET DEFINE`, `SET FEEDBACK`, other display options | Skipped with an info message |
+| `SET ROLE`, `SET TRANSACTION`, `SET CONSTRAINTS` | SQL: go to the database |
+
+Other databases: `SET` goes to the database.
