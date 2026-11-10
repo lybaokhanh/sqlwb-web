@@ -6,6 +6,8 @@ Rules: [CONTRIBUTING.md](CONTRIBUTING.md#feature-docs-and-releases).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-10
+
 ### Fixed
 
 - Oracle: `SET SERVEROUTPUT ON` works. It failed with ORA-00922. The log now shows the DBMS_OUTPUT lines after each statement. Other SQL*Plus display options (`SET ECHO`, `SET DEFINE`, ...) are skipped. [Docs](docs/features/sql-editor.md#sqlplus-commands-oracle)
@@ -119,7 +121,8 @@ First release.
 
   ![Engine update](docs/images/engine-update.png)
 
-[Unreleased]: https://github.com/lybaokhanh/sqlwb-web/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/lybaokhanh/sqlwb-web/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/lybaokhanh/sqlwb-web/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/lybaokhanh/sqlwb-web/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/lybaokhanh/sqlwb-web/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/lybaokhanh/sqlwb-web/compare/v0.1.1...v0.2.0
